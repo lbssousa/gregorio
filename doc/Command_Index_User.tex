@@ -1319,7 +1319,13 @@ Controls whether extra horizontal space is inserted between consecutive glyphs
 within a syllable when the NABC content of the preceding glyph extends past the
 combined width of that glyph and the inter-glyph spacing.  This prevents NABC
 neumes from overlapping the next glyph in patterns such as
-\texttt{(gabc1|nabc1)(gabc2|nabc2)}.  By default this feature is disabled.
+\texttt{(gabc1|nabc1)(gabc2|nabc2)}.  In two-voice scores, the compensation
+kern is computed per-voice: only voices that both overflowed in the previous
+glyph \emph{and} carry new NABC content in the current glyph contribute to the
+kern.  This prevents spurious padding when, e.g., voice~1 has a wide neume
+but voice~1's next snippet is empty (as in
+\texttt{(gabc1|nabc1|nabc2|gabc2||nabc2only)}).  By default this feature is
+disabled.
 
 \begin{argtable}
   \#1 & \texttt{true} & Enable inter-glyph NABC padding.\\

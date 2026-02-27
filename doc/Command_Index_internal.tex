@@ -759,7 +759,7 @@ Macro to help typesetting vertical episema.
 \end{argtable}
 
 \macroname{\textbackslash gre@newglyphcommon}{}{gregoriotex-syllable.tex}
-Macro called before each glyph.  When \verb=\ifgre@nabc@interglyphpadding= is true, performs a two-phase right-balance check: saves the previous glyph's \verb=\gre@dimen@nabc@rightbalance= into \verb=\gre@dimen@nabc@prevbalance= and resets it to 0pt (phase~1), then after the NABC pre-phase runs, emits a compensating kern only if both the saved balance and the freshly-set balance are positive (phase~2).  This prevents spurious padding through \texttt{/} glyph breaks and \texttt{@} forced neume breaks (which generate \verb=\GreEndOfElement= in the \texttt{.gtex} output) where the NABC spans the whole element and no new prepare call runs.  Also handles the NABC two-phase pre/emit processing for all voices.
+Macro called before each glyph.  When \verb=\ifgre@nabc@interglyphpadding= is true, performs a two-phase per-voice right-balance check.  Phase~1: saves the previous glyph's combined and per-voice right-balances (\verb=\gre@dimen@nabc@rightbalance=, \verb=@i=, \verb=@ii=) into their \verb=prevbalance= counterparts, then resets the \verb=rightbalance= registers to 0pt.  Phase~2 (after the NABC pre-phase runs): evaluates each voice independently --- a voice contributes to the kern accumulator only if \emph{both} its \verb=prevbalance@\textit{v}= is positive (previous glyph overflowed in that voice) \emph{and} its \verb=rightbalance@\textit{v}= is positive (NABC content was armed for this glyph in that voice).  Voices that overflowed but whose next snippet is empty have their \verb=rightbalance@\textit{v}= restored so the overflow continues to be tracked and reduced by subsequent horizontal advances.  The combined \verb=rightbalance= is recomputed as \(\max(\verb=@i=, \verb=@ii=)\) after any restores.  The final kern is the maximum contribution across all voices.  This prevents spurious padding through \texttt{/} glyph breaks, \texttt{@} neume fusions, and empty voice snippets.  Also handles the NABC two-phase pre/emit processing for all voices.
 
 \macroname{\textbackslash greoldcatcode}{}{gregoriotex.tex}
 Macro to store the catcode for ``@'' so that we can use said symbol in function names under Plain \TeX\ and then restore the original catcode after the package is done loading.
@@ -774,7 +774,12 @@ Resets the ledger line heuristic flags.
 Macro for opening up greextra font.
 
 \macroname{\textbackslash gre@syllablenotes}{\#1}{gregoriotex-syllable.tex}
-Macro for populating \verb=\gre@box@syllablenotes=.
+Macro for populating \verb=\gre@box@syllablenotes=.  Resets all NABC tracking
+registers (\verb=\gre@dimen@nabc@maxwidth=, \verb=\gre@dimen@nabc@extrakern=,
+combined and per-voice \verb=rightbalance=, \verb=prevbalance=) before the
+boxing pass, and resets the \verb=rightbalance= registers again after boxing to
+prevent state leakage into the real rendering pass.  When notes are visible,
+calls \verb=\gre@compute@nabc@extrakern= to widen the box if NABC overflows.
 
 \begin{argtable}
   \#1 & string & The contents to be placed in the box\\
@@ -1472,7 +1477,7 @@ Prints the nabc glyphs for the given nabc string.
 \end{argtable}
 
 \macroname{\textbackslash gre@nabc@prepare}{\#1\#2}{gregoriotex-main.tex}
-Phase 1 of NABC two-phase processing: pre-evaluates NABC content, tracks the maximum NABC width in \verb=\gre@dimen@nabc@maxwidth= for right-overflow detection by \verb=\gre@compute@nabc@extrakern=, emits note-level kern for left overflow (in \texttt{neume} alignment mode) unless \verb=\ifgre@nabc@suppress@leftoverflow= is true, and saves the rendered content in a box register.  When \verb=\ifgre@nabc@interglyphpadding= is true, also updates \verb=\gre@dimen@nabc@rightbalance= to the maximum NABC width across all voices for the current glyph.
+Phase 1 of NABC two-phase processing: pre-evaluates NABC content, tracks the maximum NABC width in \verb=\gre@dimen@nabc@maxwidth= for right-overflow detection by \verb=\gre@compute@nabc@extrakern=, emits note-level kern for left overflow (in \texttt{neume} alignment mode) unless \verb=\ifgre@nabc@suppress@leftoverflow= is true, and saves the rendered content in a box register.  When \verb=\ifgre@nabc@interglyphpadding= is true, also updates the combined \verb=\gre@dimen@nabc@rightbalance= to the maximum NABC width across all voices for the current glyph.  Note: the per-voice \verb=rightbalance@i= / \verb=@ii= registers are set by the arm macros (\verb=\GreSetNabcAboveLines= etc.) \emph{after} calling \verb=\gre@nabc@prepare=, not inside this macro itself.
 
 \begin{argtable}
   \#1 & content & The NABC content (from \textbackslash GreNABCChar)\\
@@ -2363,13 +2368,25 @@ Tracks the maximum NABC width for the current syllable across all voices.  Used 
 Stores the extra kern needed at the end of the syllable to accommodate NABC overflow.  Computed by \verb=\gre@compute@nabc@extrakern= during the pre-measurement pass in \verb=\gre@syllablenotes= and applied after the real notes typesetting in \verb=\GreSyllable=.  Reset to 0pt at the start of each syllable.
 
 \macroname{\textbackslash gre@dimen@nabc@rightbalance}{}{gregoriotex-nabc.tex}
-Tracks the remaining NABC right-overflow within a syllable.  Set to the maximum NABC width across all voices in \verb=\gre@nabc@prepare=, then reduced by each horizontal advance: glyph width (in \verb=\GreGlyph=), inter-glyph spacing (in \verb=\GreEndOfGlyph=), and inter-element spacing (in \verb=\GreEndOfElement=).  In \verb=\gre@newglyphcommon=, the value is saved into \verb=\gre@dimen@nabc@prevbalance= and then reset to 0pt before the NABC pre-phase runs; if the pre-phase sets a new positive value (indicating new NABC content for a genuinely new element), the saved balance is emitted as a compensating kern.  If no new NABC is detected (sub-glyph of same element via \texttt{/} or \texttt{@}), the saved balance is restored so tracking continues.  Only active when \verb=\ifgre@nabc@interglyphpadding= is true.  Reset to 0pt at the start of each syllable and after the boxing pass.
+Tracks the remaining combined NABC right-overflow within a syllable.  Set to the maximum NABC width across all voices in \verb=\gre@nabc@prepare=, then reduced by each horizontal advance: glyph width (in \verb=\GreGlyph=), inter-glyph spacing (in \verb=\GreEndOfGlyph=), and inter-element spacing (in \verb=\GreEndOfElement=).  In \verb=\gre@newglyphcommon=, the value is saved into \verb=\gre@dimen@nabc@prevbalance= and then reset to 0pt before the NABC pre-phase runs.  After the per-voice kern decision, the combined value is recomputed as \(\max(\verb=@i=, \verb=@ii=)\).  Only active when \verb=\ifgre@nabc@interglyphpadding= is true.  Reset to 0pt at the start of each syllable and after the boxing pass.
+
+\macroname{\textbackslash gre@dimen@nabc@rightbalance@i}{}{gregoriotex-nabc.tex}
+Per-voice~1 (above staff) variant of \verb=\gre@dimen@nabc@rightbalance=.  Set by the arm macros (\verb=\GreSetNabcAboveLines=, \verb=\GreSetNabcAboveLinesDeferred=) to the width of the voice~1 NABC box.  Reduced by the same horizontal advances as the combined register.  Used in the phase~2 per-voice kern decision: if \verb=rightbalance@i > 0= after the pre-phase, it signals that voice~1 has new NABC content for the current glyph.
+
+\macroname{\textbackslash gre@dimen@nabc@rightbalance@ii}{}{gregoriotex-nabc.tex}
+Per-voice~2 (below staff) variant.  Mirrors \verb=\gre@dimen@nabc@rightbalance@i= for voice~2.  Set by \verb=\GreSetNabcBelowLines= / \verb=\GreSetNabcBelowLinesDeferred=.
 
 \macroname{\textbackslash gre@dimen@nabc@prevbalance}{}{gregoriotex-nabc.tex}
-Scratch register used inside \verb=\gre@newglyphcommon= to save the previous glyph's remaining right-balance (from \verb=\gre@dimen@nabc@rightbalance=) before the NABC pre-phase resets and potentially updates it.  The compensating kern is emitted only when both this saved value and the freshly-set \verb=\gre@dimen@nabc@rightbalance= are positive, ensuring that sub-glyphs linked by \texttt{/} glyph breaks or \texttt{@} forced neume breaks (which generate \verb=\GreEndOfElement= rather than \verb=\GreEndOfGlyph=) do not receive spurious padding.
+Scratch register used inside \verb=\gre@newglyphcommon= to snapshot the combined right-balance before the NABC pre-phase resets it.  After the per-voice kern decision, it is reused as the kern accumulator (reset to 0pt, then set to the maximum contributing voice's \verb=prevbalance@\textit{v}=).
+
+\macroname{\textbackslash gre@dimen@nabc@prevbalance@i}{}{gregoriotex-nabc.tex}
+Per-voice~1 snapshot of \verb=\gre@dimen@nabc@rightbalance@i= taken in phase~1 of \verb=\gre@newglyphcommon=.  In phase~2, a voice contributes to the kern only if \emph{both} \verb=prevbalance@i > 0= (overflow) and \verb=rightbalance@i > 0= (new content armed).  If the voice overflowed but has no new content, \verb=rightbalance@i= is restored from this snapshot so the overflow continues to be tracked.
+
+\macroname{\textbackslash gre@dimen@nabc@prevbalance@ii}{}{gregoriotex-nabc.tex}
+Per-voice~2 snapshot.  Mirrors \verb=\gre@dimen@nabc@prevbalance@i= for voice~2.
 
 \macroname{\textbackslash ifgre@nabc@interglyphpadding}{}{gregoriotex-nabc.tex}
-Boolean flag controlling the inter-glyph NABC padding feature.  When true, \verb=\gre@newglyphcommon= performs a two-phase check: it saves the previous glyph's \verb=\gre@dimen@nabc@rightbalance= into \verb=\gre@dimen@nabc@prevbalance=, resets \verb=\gre@dimen@nabc@rightbalance= to 0pt, lets the NABC pre-phase run, and then emits a compensating kern equal to \verb=\gre@dimen@nabc@prevbalance= only if \verb=\gre@dimen@nabc@rightbalance= was also set to a positive value (i.e.\ new NABC content was prepared for a genuinely new element).  The boxing pass reset of \verb=\gre@dimen@nabc@rightbalance= to 0pt after \verb=\gre@syllablenotes= prevents state leakage between the boxing and real rendering passes.  Set via \verb=\gresetnabcinterglyphpadding{true|false}=.
+Boolean flag controlling the inter-glyph NABC padding feature.  When true, \verb=\gre@newglyphcommon= performs a two-phase per-voice check: it saves the previous glyph's combined and per-voice right-balances into their \verb=prevbalance= counterparts, resets all \verb=rightbalance= registers to 0pt, lets the NABC pre-phase run (which re-arms only the voices that have new content), and then evaluates each voice independently.  A voice contributes to the kern accumulator only if both its \verb=prevbalance@\textit{v}= and \verb=rightbalance@\textit{v}= are positive.  Voices that overflowed but have empty next snippets have their \verb=rightbalance@\textit{v}= restored so the overflow continues to be tracked.  The final kern is the maximum across contributing voices.  The boxing pass reset of all \verb=rightbalance= registers to 0pt after \verb=\gre@syllablenotes= prevents state leakage between the boxing and real rendering passes.  Set via \verb=\gresetnabcinterglyphpadding{true|false}=.
 
 \macroname{\textbackslash gre@dimen@glyphraisevalue}{}{gregoriotex-spaces.tex}
 The value that a particular glyph must be raised to be set in the correct position.
