@@ -139,8 +139,8 @@
 % resets/updates it.  A compensating kern is emitted only when BOTH
 % prevbalance > 0 (previous element had overflow) AND the pre-phase set
 % a new positive rightbalance (current glyph carries new NABC content).
-% This prevents spurious padding through / glyph breaks or @ forced neume
-% breaks, where the NABC spans the whole element.
+% This prevents spurious padding through / glyph breaks or @ neume
+% fusions, where the NABC spans the whole element.
 \newdimen\gre@dimen@nabc@prevbalance
 \gre@dimen@nabc@prevbalance=0pt\relax
 % Per-voice breakdown of the right-balance. Using these, the kern is
@@ -155,6 +155,18 @@
 \gre@dimen@nabc@prevbalance@i=0pt\relax
 \newdimen\gre@dimen@nabc@prevbalance@ii
 \gre@dimen@nabc@prevbalance@ii=0pt\relax
+
+% Helper: reduce all right-balance registers by a horizontal advance.
+% Called from \GreGlyph, \GreEndOfGlyph, \GreEndOfElement, and
+% \gre@alteration to account for glyph widths, inter-glyph/element
+% spacing, and alteration widths.
+\def\gre@nabc@reduce@rightbalance#1{%
+  \ifgre@nabc@interglyphpadding%
+    \global\advance\gre@dimen@nabc@rightbalance by -#1\relax%
+    \global\advance\gre@dimen@nabc@rightbalance@i by -#1\relax%
+    \global\advance\gre@dimen@nabc@rightbalance@ii by -#1\relax%
+  \fi%
+}%
 
 \def\gresetnabc#1#2{%
   \gre@processvisibilitywithphantom{#2}%

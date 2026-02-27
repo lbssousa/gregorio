@@ -776,8 +776,9 @@ Macro for opening up greextra font.
 \macroname{\textbackslash gre@syllablenotes}{\#1}{gregoriotex-syllable.tex}
 Macro for populating \verb=\gre@box@syllablenotes=.  Resets all NABC tracking
 registers (\verb=\gre@dimen@nabc@maxwidth=, \verb=\gre@dimen@nabc@extrakern=,
-combined and per-voice \verb=rightbalance=, \verb=prevbalance=) before the
-boxing pass, and resets the \verb=rightbalance= registers again after boxing to
+combined and per-voice \verb=rightbalance=, \verb=prevbalance= including
+\verb=@i= and \verb=@ii=) before the boxing pass, and resets the
+\verb=rightbalance= and \verb=prevbalance= registers again after boxing to
 prevent state leakage into the real rendering pass.  When notes are visible,
 calls \verb=\gre@compute@nabc@extrakern= to widen the box if NABC overflows.
 
@@ -1476,12 +1477,13 @@ Prints the nabc glyphs for the given nabc string.
   \#2 & string & The \texttt{nabc} syntax which indicates what neumes are to be printed.\\
 \end{argtable}
 
-\macroname{\textbackslash gre@nabc@prepare}{\#1\#2}{gregoriotex-main.tex}
-Phase 1 of NABC two-phase processing: pre-evaluates NABC content, tracks the maximum NABC width in \verb=\gre@dimen@nabc@maxwidth= for right-overflow detection by \verb=\gre@compute@nabc@extrakern=, emits note-level kern for left overflow (in \texttt{neume} alignment mode) unless \verb=\ifgre@nabc@suppress@leftoverflow= is true, and saves the rendered content in a box register.  When \verb=\ifgre@nabc@interglyphpadding= is true, also updates the combined \verb=\gre@dimen@nabc@rightbalance= to the maximum NABC width across all voices for the current glyph.  Note: the per-voice \verb=rightbalance@i= / \verb=@ii= registers are set by the arm macros (\verb=\GreSetNabcAboveLines= etc.) \emph{after} calling \verb=\gre@nabc@prepare=, not inside this macro itself.
+\macroname{\textbackslash gre@nabc@prepare}{\#1\#2\#3}{gregoriotex-main.tex}
+Phase 1 of NABC two-phase processing: pre-evaluates NABC content, tracks the maximum NABC width in \verb=\gre@dimen@nabc@maxwidth= for right-overflow detection by \verb=\gre@compute@nabc@extrakern=, emits note-level kern for left overflow (in \texttt{neume} alignment mode) unless \verb=\ifgre@nabc@suppress@leftoverflow= is true, and saves the rendered content in a box register.  When \verb=\ifgre@nabc@interglyphpadding= is true, also sets the per-voice right-balance register (\verb=#3=) to the width of the rendered box so the per-voice kern decision in \verb=\gre@newglyphcommon= knows which voice overflowed.  The combined \verb=\gre@dimen@nabc@rightbalance= is no longer maintained here; it is recomputed as \(\max(\verb=@i=, \verb=@ii=)\) unconditionally in phase~2 of \verb=\gre@newglyphcommon=.
 
 \begin{argtable}
   \#1 & content & The NABC content (from \textbackslash GreNABCChar)\\
   \#2 & box register & Box register to save the rendered content to\\
+  \#3 & dimen register & Per-voice right-balance register to set (e.g.\ \verb=\gre@dimen@nabc@rightbalance@i=)\\
 \end{argtable}
 
 \macroname{\textbackslash gre@nabc@place@voice@i}{}{gregoriotex-main.tex}
@@ -1489,6 +1491,13 @@ Phase 2 of NABC two-phase processing for voice 1 (above staff): places the pre-r
 
 \macroname{\textbackslash gre@nabc@place@voice@ii}{}{gregoriotex-main.tex}
 Phase 2 of NABC two-phase processing for voice 2 (below staff): places the pre-rendered NABC voice 2 content from \textbackslash gre@box@nabc@voice@ii at the correct vertical position below the staff.
+
+\macroname{\textbackslash gre@nabc@reduce@rightbalance}{\#1}{gregoriotex-nabc.tex}
+Helper that reduces all three right-balance registers (\verb=\gre@dimen@nabc@rightbalance=, \verb=@i=, \verb=@ii=) by the horizontal advance \verb=#1=, guarded by \verb=\ifgre@nabc@interglyphpadding=.  Called from \verb=\GreGlyph= (glyph width), \verb=\GreEndOfGlyph= (inter-glyph spacing), \verb=\GreEndOfElement= (inter-element spacing), and \verb=\gre@alteration= (alteration width and spacing).
+
+\begin{argtable}
+  \#1 & dimen/skip & The amount to subtract from each right-balance register\\
+\end{argtable}
 
 \macroname{\textbackslash gre@nabc@pre@voice@i}{}{gregoriotex-main.tex}
 Deferred macro for phase~1 processing of NABC voice~1 (above staff).  Set by
@@ -2368,13 +2377,13 @@ Tracks the maximum NABC width for the current syllable across all voices.  Used 
 Stores the extra kern needed at the end of the syllable to accommodate NABC overflow.  Computed by \verb=\gre@compute@nabc@extrakern= during the pre-measurement pass in \verb=\gre@syllablenotes= and applied after the real notes typesetting in \verb=\GreSyllable=.  Reset to 0pt at the start of each syllable.
 
 \macroname{\textbackslash gre@dimen@nabc@rightbalance}{}{gregoriotex-nabc.tex}
-Tracks the remaining combined NABC right-overflow within a syllable.  Set to the maximum NABC width across all voices in \verb=\gre@nabc@prepare=, then reduced by each horizontal advance: glyph width (in \verb=\GreGlyph=), inter-glyph spacing (in \verb=\GreEndOfGlyph=), and inter-element spacing (in \verb=\GreEndOfElement=).  In \verb=\gre@newglyphcommon=, the value is saved into \verb=\gre@dimen@nabc@prevbalance= and then reset to 0pt before the NABC pre-phase runs.  After the per-voice kern decision, the combined value is recomputed as \(\max(\verb=@i=, \verb=@ii=)\).  Only active when \verb=\ifgre@nabc@interglyphpadding= is true.  Reset to 0pt at the start of each syllable and after the boxing pass.
+Tracks the remaining combined NABC right-overflow within a syllable.  Recomputed as \(\max(\verb=@i=, \verb=@ii=)\) unconditionally in phase~2 of \verb=\gre@newglyphcommon=, then reduced by each horizontal advance via \verb=\gre@nabc@reduce@rightbalance=: glyph width (in \verb=\GreGlyph=), inter-glyph spacing (in \verb=\GreEndOfGlyph=), inter-element spacing (in \verb=\GreEndOfElement=), and alteration widths/spacing (in \verb=\gre@alteration=).  In \verb=\gre@newglyphcommon=, the value is saved into \verb=\gre@dimen@nabc@prevbalance= and then reset to 0pt before the NABC pre-phase runs.  Only active when \verb=\ifgre@nabc@interglyphpadding= is true.  Reset to 0pt at the start of each syllable and after the boxing pass.
 
 \macroname{\textbackslash gre@dimen@nabc@rightbalance@i}{}{gregoriotex-nabc.tex}
-Per-voice~1 (above staff) variant of \verb=\gre@dimen@nabc@rightbalance=.  Set by the arm macros (\verb=\GreSetNabcAboveLines=, \verb=\GreSetNabcAboveLinesDeferred=) to the width of the voice~1 NABC box.  Reduced by the same horizontal advances as the combined register.  Used in the phase~2 per-voice kern decision: if \verb=rightbalance@i > 0= after the pre-phase, it signals that voice~1 has new NABC content for the current glyph.
+Per-voice~1 (above staff) variant of \verb=\gre@dimen@nabc@rightbalance=.  Set inside \verb=\gre@nabc@prepare= via its third argument when called from the arm macros (\verb=\GreSetNabcAboveLines=, \verb=\GreSetNabcAboveLinesDeferred=).  Reduced by the same horizontal advances as the combined register (through \verb=\gre@nabc@reduce@rightbalance=).  Used in the phase~2 per-voice kern decision: if \verb=rightbalance@i > 0= after the pre-phase, it signals that voice~1 has new NABC content for the current glyph.
 
 \macroname{\textbackslash gre@dimen@nabc@rightbalance@ii}{}{gregoriotex-nabc.tex}
-Per-voice~2 (below staff) variant.  Mirrors \verb=\gre@dimen@nabc@rightbalance@i= for voice~2.  Set by \verb=\GreSetNabcBelowLines= / \verb=\GreSetNabcBelowLinesDeferred=.
+Per-voice~2 (below staff) variant.  Mirrors \verb=\gre@dimen@nabc@rightbalance@i= for voice~2.  Set inside \verb=\gre@nabc@prepare= when called from \verb=\GreSetNabcBelowLines= / \verb=\GreSetNabcBelowLinesDeferred=.
 
 \macroname{\textbackslash gre@dimen@nabc@prevbalance}{}{gregoriotex-nabc.tex}
 Scratch register used inside \verb=\gre@newglyphcommon= to snapshot the combined right-balance before the NABC pre-phase resets it.  After the per-voice kern decision, it is reused as the kern accumulator (reset to 0pt, then set to the maximum contributing voice's \verb=prevbalance@\textit{v}=).

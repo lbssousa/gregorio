@@ -2807,12 +2807,7 @@
   \fi %
   \raise \gre@dimen@glyphraisevalue%
   \copy\gre@box@temp@width%
-  % Reduce NABC right-balance by the alteration width (horizontal advance).
-  \ifgre@nabc@interglyphpadding%
-    \global\advance\gre@dimen@nabc@rightbalance by -\wd\gre@box@temp@width\relax%
-    \global\advance\gre@dimen@nabc@rightbalance@i by -\wd\gre@box@temp@width\relax%
-    \global\advance\gre@dimen@nabc@rightbalance@ii by -\wd\gre@box@temp@width\relax%
-  \fi%
+  \gre@nabc@reduce@rightbalance{\wd\gre@box@temp@width}%
   \ifgre@notes@invisrender
     \phantom{#5}\relax %
   \else
@@ -2832,12 +2827,7 @@
     \else %
       \gre@hskip\gre@skip@temp@four %
     \fi %
-    % Reduce NABC right-balance by the alteration space just emitted.
-    \ifgre@nabc@interglyphpadding%
-      \global\advance\gre@dimen@nabc@rightbalance by -\gre@skip@temp@four\relax%
-      \global\advance\gre@dimen@nabc@rightbalance@i by -\gre@skip@temp@four\relax%
-      \global\advance\gre@dimen@nabc@rightbalance@ii by -\gre@skip@temp@four\relax%
-    \fi%
+    \gre@nabc@reduce@rightbalance{\gre@skip@temp@four}%
     \GreNoBreak %
   \fi %
   \relax %

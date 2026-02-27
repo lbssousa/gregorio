@@ -151,15 +151,22 @@
           \global\gre@dimen@nabc@rightbalance@ii=\gre@dimen@nabc@prevbalance@ii\relax%
         \fi%
       \fi%
-      % Update combined rightbalance = MAX(@i, @ii) after any restores.
-      \global\gre@dimen@nabc@rightbalance=\gre@dimen@nabc@rightbalance@i\relax%
-      \ifdim\gre@dimen@nabc@rightbalance@ii>\gre@dimen@nabc@rightbalance\relax%
-        \global\gre@dimen@nabc@rightbalance=\gre@dimen@nabc@rightbalance@ii\relax%
-      \fi%
       % Emit kern if any voice needs it; rightbalances already restored above.
+      % NOTE: when both voices overflow simultaneously but with alternating
+      % content, the emitted kern is not subtracted from restored
+      % rightbalance@v registers, so subsequent kerns may be slightly
+      % overestimated (conservative: never causes overlap).
       \ifdim\gre@dimen@nabc@prevbalance>0pt\relax%
         \kern\gre@dimen@nabc@prevbalance\relax%
       \fi%
+    \fi%
+    % Recompute combined rightbalance = MAX(@i, @ii) unconditionally,
+    % covering both the first glyph (where prevbalance=0 and per-voice
+    % registers are freshly set by \gre@nabc@prepare) and subsequent
+    % glyphs (where per-voice restores may have updated @i/@ii).
+    \global\gre@dimen@nabc@rightbalance=\gre@dimen@nabc@rightbalance@i\relax%
+    \ifdim\gre@dimen@nabc@rightbalance@ii>\gre@dimen@nabc@rightbalance\relax%
+      \global\gre@dimen@nabc@rightbalance=\gre@dimen@nabc@rightbalance@ii\relax%
     \fi%
   \fi%
   \gre@nabc@emit@voice@i
@@ -251,12 +258,7 @@
   \else
     \hbox{\unhcopy\gre@box@temp@width}%
   \fi
-  % Reduce NABC right-balance by the glyph width (horizontal advance).
-  \ifgre@nabc@interglyphpadding%
-    \global\advance\gre@dimen@nabc@rightbalance by -\gre@dimen@lastglyphwidth\relax%
-    \global\advance\gre@dimen@nabc@rightbalance@i by -\gre@dimen@lastglyphwidth\relax%
-    \global\advance\gre@dimen@nabc@rightbalance@ii by -\gre@dimen@lastglyphwidth\relax%
-  \fi%
+  \gre@nabc@reduce@rightbalance{\gre@dimen@lastglyphwidth}%
   \ifgre@endofscore\else\ifgre@boxing\else %
     #3%
   \fi\fi %
@@ -606,7 +608,10 @@
   \global\gre@dimen@nabc@rightbalance=0pt\relax %
   \global\gre@dimen@nabc@rightbalance@i=0pt\relax %
   \global\gre@dimen@nabc@rightbalance@ii=0pt\relax %
+  % prevbalance registers are scratch locals: reset without \global.
   \gre@dimen@nabc@prevbalance=0pt\relax %
+  \gre@dimen@nabc@prevbalance@i=0pt\relax %
+  \gre@dimen@nabc@prevbalance@ii=0pt\relax %
   \let\ifgre@saved@prenotes@lastendswithmora\ifgre@lastendswithmora%
   \xdef\gre@saved@prenotes@lastoflinecount{\number\gre@lastoflinecount\relax }%
   \ifgre@shownotes%
@@ -628,10 +633,13 @@
   \gre@debugmsg{spacing}{Width of notes: \the\wd\gre@box@syllablenotes}%
   \global\gre@boxingfalse%
   \global\gre@firstglyphtrue%
-  % Reset rightbalance after boxing so the real pass starts clean.
+  % Reset rightbalance and prevbalance after boxing so the real pass starts clean.
   \global\gre@dimen@nabc@rightbalance=0pt\relax %
   \global\gre@dimen@nabc@rightbalance@i=0pt\relax %
   \global\gre@dimen@nabc@rightbalance@ii=0pt\relax %
+  \gre@dimen@nabc@prevbalance=0pt\relax %
+  \gre@dimen@nabc@prevbalance@i=0pt\relax %
+  \gre@dimen@nabc@prevbalance@ii=0pt\relax %
   % now gre@lastendswithmora is true if this syllable ends with a
   % punctum mora, but we still want to keep gre@lastendswithmora if we
   % are on a bar, so:
