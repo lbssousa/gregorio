@@ -393,7 +393,7 @@ Macro to mark the end of a EUOUAE block.
 \end{argtable}
 
 \macroname{\textbackslash GreEndOfElement}{\#1\#2\#3}{gregoriotex-main.tex}
-Macro to end elements.
+Macro to end elements.  When \verb=\ifgre@nabc@interglyphpadding= is true, reduces \verb=\gre@dimen@nabc@rightbalance= by the inter-element spacing that was just emitted.
 
 \begin{argtable}
   \#1 & \texttt{0} & Default space.\\
@@ -420,7 +420,7 @@ Macro to end a no line break area.
 \end{argtable}
 
 \macroname{\textbackslash GreEndOfGlyph}{\#1}{gregoriotex-main.tex}
-Macro to end a glyph without ending the element.
+Macro to end a glyph without ending the element.  When \verb=\ifgre@nabc@interglyphpadding= is true, reduces \verb=\gre@dimen@nabc@rightbalance= by the inter-glyph spacing that was just emitted (but does not emit a kern, since sub-glyphs within the same element are naturally covered by the element's NABC annotation).
 
 \begin{argtable}
   \#1 & \texttt{0} & Default space.\\

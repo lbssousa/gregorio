@@ -709,6 +709,14 @@
   \ifdim\wd\gre@box@nabctemp>\gre@dimen@nabc@maxwidth\relax%
     \global\gre@dimen@nabc@maxwidth=\wd\gre@box@nabctemp\relax%
   \fi%
+  % Update inter-glyph right-balance: keep the maximum NABC width across
+  % all voices for this glyph so the next glyph can check whether extra
+  % padding is needed.
+  \ifgre@nabc@interglyphpadding%
+    \ifdim\wd\gre@box@nabctemp>\gre@dimen@nabc@rightbalance\relax%
+      \global\gre@dimen@nabc@rightbalance=\wd\gre@box@nabctemp\relax%
+    \fi%
+  \fi%
   \ifgre@nabc@suppress@leftoverflow\else%
     \ifdim\gre@dimen@nabcleftoverflow>\gre@dimen@nabckernemitted\relax%
       \kern\dimexpr(\gre@dimen@nabcleftoverflow-\gre@dimen@nabckernemitted)\relax%
@@ -1512,6 +1520,10 @@
   \else%
     \gre@error{Unrecognized space type #1}%
   \fi%
+  % Reduce NABC right-balance by the inter-element space just emitted.
+  \ifgre@nabc@interglyphpadding%
+    \global\advance\gre@dimen@nabc@rightbalance by -\gre@skip@temp@four\relax%
+  \fi%
   \ifgre@unbreakableendofelement %
     \GreNoBreak %
   \fi %
@@ -1616,6 +1628,10 @@
   \GreNoBreak %
   \gre@get@spaceskip{#1}%
   \gre@hskip\gre@skip@temp@four %
+  % Reduce NABC right-balance by the inter-glyph space just emitted.
+  \ifgre@nabc@interglyphpadding%
+    \global\advance\gre@dimen@nabc@rightbalance by -\gre@skip@temp@four\relax%
+  \fi%
   \GreNoBreak %
   \relax%
 }%

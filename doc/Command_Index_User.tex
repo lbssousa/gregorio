@@ -1314,6 +1314,18 @@ square note.  By default this feature is disabled.
   & \texttt{false} & Use the leftmost symbol as anchor (default).\\
 \end{argtable}
 
+\macroname{\textbackslash gresetnabcinterglyphpadding}{\{\#1\}}{gregoriotex-nabc.tex}
+Controls whether extra horizontal space is inserted between consecutive glyphs
+within a syllable when the NABC content of the preceding glyph extends past the
+combined width of that glyph and the inter-glyph spacing.  This prevents NABC
+neumes from overlapping the next glyph in patterns such as
+\texttt{(gabc1|nabc1)(gabc2|nabc2)}.  By default this feature is disabled.
+
+\begin{argtable}
+  \#1 & \texttt{true} & Enable inter-glyph NABC padding.\\
+  & \texttt{false} & Disable inter-glyph NABC padding (default).\\
+\end{argtable}
+
 \macroname{\textbackslash greprintsigns}{\{\#1\}\{\#2\}}{gregoriotex-signs.tex}
 Macro to prevent rythmic signs from printing (all signs are printed by default):
 

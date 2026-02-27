@@ -95,6 +95,13 @@
     \global\gre@lastoflinecount=0\relax %
   \fi %
   \global\gre@skip@bar@lastskip=0pt\relax %
+  % Inter-glyph NABC right padding (phase 1 of 2): save the previous
+  % glyph's remaining right-balance and reset to 0 so the NABC pre-phase
+  % can set a fresh value if this glyph carries new NABC content.
+  \ifgre@nabc@interglyphpadding%
+    \gre@dimen@nabc@prevbalance=\gre@dimen@nabc@rightbalance\relax%
+    \global\gre@dimen@nabc@rightbalance=0pt\relax%
+  \fi%
   \gre@currenttextabovelines %
   % NABC two-phase processing: first pre-evaluate all voices and emit
   % note-level kerns, then place all voice hboxes.  This ensures each
@@ -105,6 +112,28 @@
   % Ensure nabcleftoverflow holds the max for text alignment adjustment.
   \ifdim\gre@dimen@nabckernemitted>\gre@dimen@nabcleftoverflow\relax%
     \global\gre@dimen@nabcleftoverflow=\gre@dimen@nabckernemitted\relax%
+  \fi%
+  % Inter-glyph NABC right padding (phase 2 of 2): emit the compensating
+  % kern only when BOTH (a) the previous glyph's NABC overflowed AND
+  % (b) the current glyph carries new NABC content (rightbalance > 0
+  % after the pre-phase).  Condition (b) avoids spurious padding through
+  % / glyph breaks and @ forced neume breaks (which generate
+  % \GreEndOfElement in the .gtex output), where the NABC spans the
+  % whole element and no new prepare call runs.
+  % When no new NABC is prepared, the balance is restored so it continues
+  % to be tracked and reduced by subsequent glyph widths and spacings.
+  \ifgre@nabc@interglyphpadding%
+    \ifdim\gre@dimen@nabc@prevbalance>0pt\relax%
+      \ifdim\gre@dimen@nabc@rightbalance>0pt\relax%
+        % New NABC was prepared: emit compensating kern from previous overflow.
+        \kern\gre@dimen@nabc@prevbalance\relax%
+      \else%
+        % No new NABC for this glyph (sub-glyph of same element):
+        % restore the balance so it continues to be tracked and reduced
+        % by subsequent glyph widths and spacings.
+        \global\gre@dimen@nabc@rightbalance=\gre@dimen@nabc@prevbalance\relax%
+      \fi%
+    \fi%
   \fi%
   \gre@nabc@emit@voice@i
   \gre@nabc@emit@voice@ii
@@ -195,6 +224,10 @@
   \else
     \hbox{\unhcopy\gre@box@temp@width}%
   \fi
+  % Reduce NABC right-balance by the glyph width (horizontal advance).
+  \ifgre@nabc@interglyphpadding%
+    \global\advance\gre@dimen@nabc@rightbalance by -\gre@dimen@lastglyphwidth\relax%
+  \fi%
   \ifgre@endofscore\else\ifgre@boxing\else %
     #3%
   \fi\fi %
@@ -541,6 +574,8 @@
   % Reset NABC tracking for this syllable.
   \global\gre@dimen@nabc@maxwidth=0pt\relax %
   \global\gre@dimen@nabc@extrakern=0pt\relax %
+  \global\gre@dimen@nabc@rightbalance=0pt\relax %
+  \gre@dimen@nabc@prevbalance=0pt\relax %
   \let\ifgre@saved@prenotes@lastendswithmora\ifgre@lastendswithmora%
   \xdef\gre@saved@prenotes@lastoflinecount{\number\gre@lastoflinecount\relax }%
   \ifgre@shownotes%
@@ -562,6 +597,8 @@
   \gre@debugmsg{spacing}{Width of notes: \the\wd\gre@box@syllablenotes}%
   \global\gre@boxingfalse%
   \global\gre@firstglyphtrue%
+  % Reset rightbalance after boxing so the real pass starts clean.
+  \global\gre@dimen@nabc@rightbalance=0pt\relax %
   % now gre@lastendswithmora is true if this syllable ends with a
   % punctum mora, but we still want to keep gre@lastendswithmora if we
   % are on a bar, so:
