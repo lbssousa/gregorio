@@ -755,6 +755,9 @@
 \def\GreSetNabcAboveLines#1{%
   \gdef\gre@nabc@pre@voice@i{%
     \gre@nabc@prepare{#1}\gre@box@nabc@voice@i%
+    \ifgre@nabc@interglyphpadding%
+      \global\gre@dimen@nabc@rightbalance@i=\wd\gre@box@nabc@voice@i\relax%
+    \fi%
     \gdef\gre@nabc@pre@voice@i{}%
   }%
   \gdef\gre@nabc@emit@voice@i{%
@@ -767,6 +770,9 @@
 \def\GreSetNabcBelowLines#1{%
   \gdef\gre@nabc@pre@voice@ii{%
     \gre@nabc@prepare{#1}\gre@box@nabc@voice@ii%
+    \ifgre@nabc@interglyphpadding%
+      \global\gre@dimen@nabc@rightbalance@ii=\wd\gre@box@nabc@voice@ii\relax%
+    \fi%
     \gdef\gre@nabc@pre@voice@ii{}%
   }%
   \gdef\gre@nabc@emit@voice@ii{%
@@ -788,6 +794,9 @@
         \gre@nabc@suppress@leftoverflowtrue%
       \fi%
       \gre@nabc@prepare{#1}\gre@box@nabc@voice@i%
+      \ifgre@nabc@interglyphpadding%
+        \global\gre@dimen@nabc@rightbalance@i=\wd\gre@box@nabc@voice@i\relax%
+      \fi%
       \gre@nabc@suppress@leftoverflowfalse%
       \global\gre@nabc@voice@i@altskippedfalse%
       \global\gre@nabc@voice@i@readytrue%
@@ -817,6 +826,9 @@
         \gre@nabc@suppress@leftoverflowtrue%
       \fi%
       \gre@nabc@prepare{#1}\gre@box@nabc@voice@ii%
+      \ifgre@nabc@interglyphpadding%
+        \global\gre@dimen@nabc@rightbalance@ii=\wd\gre@box@nabc@voice@ii\relax%
+      \fi%
       \gre@nabc@suppress@leftoverflowfalse%
       \global\gre@nabc@voice@ii@altskippedfalse%
       \global\gre@nabc@voice@ii@readytrue%
@@ -1523,6 +1535,8 @@
   % Reduce NABC right-balance by the inter-element space just emitted.
   \ifgre@nabc@interglyphpadding%
     \global\advance\gre@dimen@nabc@rightbalance by -\gre@skip@temp@four\relax%
+    \global\advance\gre@dimen@nabc@rightbalance@i by -\gre@skip@temp@four\relax%
+    \global\advance\gre@dimen@nabc@rightbalance@ii by -\gre@skip@temp@four\relax%
   \fi%
   \ifgre@unbreakableendofelement %
     \GreNoBreak %
@@ -1631,6 +1645,8 @@
   % Reduce NABC right-balance by the inter-glyph space just emitted.
   \ifgre@nabc@interglyphpadding%
     \global\advance\gre@dimen@nabc@rightbalance by -\gre@skip@temp@four\relax%
+    \global\advance\gre@dimen@nabc@rightbalance@i by -\gre@skip@temp@four\relax%
+    \global\advance\gre@dimen@nabc@rightbalance@ii by -\gre@skip@temp@four\relax%
   \fi%
   \GreNoBreak %
   \relax%

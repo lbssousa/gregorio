@@ -100,7 +100,11 @@
   % can set a fresh value if this glyph carries new NABC content.
   \ifgre@nabc@interglyphpadding%
     \gre@dimen@nabc@prevbalance=\gre@dimen@nabc@rightbalance\relax%
+    \gre@dimen@nabc@prevbalance@i=\gre@dimen@nabc@rightbalance@i\relax%
+    \gre@dimen@nabc@prevbalance@ii=\gre@dimen@nabc@rightbalance@ii\relax%
     \global\gre@dimen@nabc@rightbalance=0pt\relax%
+    \global\gre@dimen@nabc@rightbalance@i=0pt\relax%
+    \global\gre@dimen@nabc@rightbalance@ii=0pt\relax%
   \fi%
   \gre@currenttextabovelines %
   % NABC two-phase processing: first pre-evaluate all voices and emit
@@ -115,23 +119,46 @@
   \fi%
   % Inter-glyph NABC right padding (phase 2 of 2): emit the compensating
   % kern only when BOTH (a) the previous glyph's NABC overflowed AND
-  % (b) the current glyph carries new NABC content (rightbalance > 0
-  % after the pre-phase).  Condition (b) avoids spurious padding through
-  % / glyph breaks and @ forced neume breaks (which generate
-  % \GreEndOfElement in the .gtex output), where the NABC spans the
-  % whole element and no new prepare call runs.
-  % When no new NABC is prepared, the balance is restored so it continues
-  % to be tracked and reduced by subsequent glyph widths and spacings.
+  % (b) at least one voice that overflowed also has new NABC content in
+  % the current glyph (checked per-voice via rightbalance@i/@ii).
+  % Voices that overflowed but have empty next snippets do NOT contribute
+  % to the kern — this prevents spurious separation when e.g. voice i
+  % has ||cl- (empty voice i) after a wide tssun1 neume.
+  % Voices without new content have their rightbalance restored so the
+  % overflow continues to be tracked and reduced by subsequent advances.
   \ifgre@nabc@interglyphpadding%
     \ifdim\gre@dimen@nabc@prevbalance>0pt\relax%
-      \ifdim\gre@dimen@nabc@rightbalance>0pt\relax%
-        % New NABC was prepared: emit compensating kern from previous overflow.
+      \gre@dimen@nabc@prevbalance=0pt\relax% reuse as kern accumulator
+      % Voice i
+      \ifdim\gre@dimen@nabc@prevbalance@i>0pt\relax%
+        \ifdim\gre@dimen@nabc@rightbalance@i>0pt\relax%
+          \ifdim\gre@dimen@nabc@prevbalance@i>\gre@dimen@nabc@prevbalance\relax%
+            \gre@dimen@nabc@prevbalance=\gre@dimen@nabc@prevbalance@i\relax%
+          \fi%
+        \else%
+          % Voice i overflowed but next snippet is empty: restore for tracking.
+          \global\gre@dimen@nabc@rightbalance@i=\gre@dimen@nabc@prevbalance@i\relax%
+        \fi%
+      \fi%
+      % Voice ii
+      \ifdim\gre@dimen@nabc@prevbalance@ii>0pt\relax%
+        \ifdim\gre@dimen@nabc@rightbalance@ii>0pt\relax%
+          \ifdim\gre@dimen@nabc@prevbalance@ii>\gre@dimen@nabc@prevbalance\relax%
+            \gre@dimen@nabc@prevbalance=\gre@dimen@nabc@prevbalance@ii\relax%
+          \fi%
+        \else%
+          % Voice ii overflowed but next snippet is empty: restore for tracking.
+          \global\gre@dimen@nabc@rightbalance@ii=\gre@dimen@nabc@prevbalance@ii\relax%
+        \fi%
+      \fi%
+      % Update combined rightbalance = MAX(@i, @ii) after any restores.
+      \global\gre@dimen@nabc@rightbalance=\gre@dimen@nabc@rightbalance@i\relax%
+      \ifdim\gre@dimen@nabc@rightbalance@ii>\gre@dimen@nabc@rightbalance\relax%
+        \global\gre@dimen@nabc@rightbalance=\gre@dimen@nabc@rightbalance@ii\relax%
+      \fi%
+      % Emit kern if any voice needs it; rightbalances already restored above.
+      \ifdim\gre@dimen@nabc@prevbalance>0pt\relax%
         \kern\gre@dimen@nabc@prevbalance\relax%
-      \else%
-        % No new NABC for this glyph (sub-glyph of same element):
-        % restore the balance so it continues to be tracked and reduced
-        % by subsequent glyph widths and spacings.
-        \global\gre@dimen@nabc@rightbalance=\gre@dimen@nabc@prevbalance\relax%
       \fi%
     \fi%
   \fi%
@@ -227,6 +254,8 @@
   % Reduce NABC right-balance by the glyph width (horizontal advance).
   \ifgre@nabc@interglyphpadding%
     \global\advance\gre@dimen@nabc@rightbalance by -\gre@dimen@lastglyphwidth\relax%
+    \global\advance\gre@dimen@nabc@rightbalance@i by -\gre@dimen@lastglyphwidth\relax%
+    \global\advance\gre@dimen@nabc@rightbalance@ii by -\gre@dimen@lastglyphwidth\relax%
   \fi%
   \ifgre@endofscore\else\ifgre@boxing\else %
     #3%
@@ -575,6 +604,8 @@
   \global\gre@dimen@nabc@maxwidth=0pt\relax %
   \global\gre@dimen@nabc@extrakern=0pt\relax %
   \global\gre@dimen@nabc@rightbalance=0pt\relax %
+  \global\gre@dimen@nabc@rightbalance@i=0pt\relax %
+  \global\gre@dimen@nabc@rightbalance@ii=0pt\relax %
   \gre@dimen@nabc@prevbalance=0pt\relax %
   \let\ifgre@saved@prenotes@lastendswithmora\ifgre@lastendswithmora%
   \xdef\gre@saved@prenotes@lastoflinecount{\number\gre@lastoflinecount\relax }%
@@ -599,6 +630,8 @@
   \global\gre@firstglyphtrue%
   % Reset rightbalance after boxing so the real pass starts clean.
   \global\gre@dimen@nabc@rightbalance=0pt\relax %
+  \global\gre@dimen@nabc@rightbalance@i=0pt\relax %
+  \global\gre@dimen@nabc@rightbalance@ii=0pt\relax %
   % now gre@lastendswithmora is true if this syllable ends with a
   % punctum mora, but we still want to keep gre@lastendswithmora if we
   % are on a bar, so:

@@ -143,6 +143,18 @@
 % breaks, where the NABC spans the whole element.
 \newdimen\gre@dimen@nabc@prevbalance
 \gre@dimen@nabc@prevbalance=0pt\relax
+% Per-voice breakdown of the right-balance. Using these, the kern is
+% emitted only for the voice(s) that both overflowed AND have non-empty
+% NABC in the next glyph. This prevents spurious padding when the
+% overflowing voice's next snippet is empty.
+\newdimen\gre@dimen@nabc@rightbalance@i
+\gre@dimen@nabc@rightbalance@i=0pt\relax
+\newdimen\gre@dimen@nabc@rightbalance@ii
+\gre@dimen@nabc@rightbalance@ii=0pt\relax
+\newdimen\gre@dimen@nabc@prevbalance@i
+\gre@dimen@nabc@prevbalance@i=0pt\relax
+\newdimen\gre@dimen@nabc@prevbalance@ii
+\gre@dimen@nabc@prevbalance@ii=0pt\relax
 
 \def\gresetnabc#1#2{%
   \gre@processvisibilitywithphantom{#2}%
