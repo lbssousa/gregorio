@@ -137,8 +137,37 @@ local catcode_at_letter = luatexbase.catcodetables['gre@atletter']
 
 local first_line_prevdepth = 0
 
+-- On Unix, os.spawn() uses fork()+execve() and the child inherits every fd
+-- open in the LuaTeX parent (including any \input-ted .tex file).  Parent and
+-- child share the same kernel file description (f_pos), so any fd activity in
+-- the child can silently advance the read offset of files LuaTeX is still
+-- scanning, corrupting TeX's input state.  io.popen() runs through /bin/sh,
+-- which manages its own fd space before exec, eliminating the inheritance.
+-- On Windows, os.spawn() maps to CreateProcess which does not inherit fds by
+-- default, so the original path is preserved there.
+local function gre_shellquote(s)
+  return "'" .. s:gsub("'", "'\\''") .. "'"
+end
+local function gre_build_cmdstr(cmd)
+  local quoted = {}
+  for i, a in ipairs(cmd) do quoted[i] = gre_shellquote(a) end
+  return table.concat(quoted, ' ')
+end
+local gre_use_popen = (os.type ~= 'windows')
+
 local function get_prog_output(cmd, tmpname, fmt)
-  local rc = os.spawn(cmd)
+  local rc
+  if gre_use_popen then
+    local handle = io.popen(gre_build_cmdstr(cmd), 'r')
+    rc = 1
+    if handle then
+      handle:read('*all')
+      local ok, _, code = handle:close()
+      if ok then rc = 0 else rc = code or 1 end
+    end
+  else
+    rc = os.spawn(cmd)
+  end
   local content = nil
   if rc == 0 then
     local f = io.open(tmpname, 'r');
@@ -1316,7 +1345,18 @@ local function compile_gabc(gabc_file, gtex_file, glog_file, allow_deprecated)
   kpse.record_input_file(gabc_file)
   kpse.record_output_file(glog_file)
   kpse.record_output_file(gtex_file)
-  local res = os.spawn(cmd)
+  local res
+  if gre_use_popen then
+    local handle = io.popen(gre_build_cmdstr(cmd), 'r')
+    res = nil
+    if handle then
+      handle:read('*all')
+      local ok, _, code = handle:close()
+      if ok then res = 0 else res = code or 1 end
+    end
+  else
+    res = os.spawn(cmd)
+  end
 
   if res == nil then
     err("\nSomething went wrong when executing\n    '%s'.\n"
