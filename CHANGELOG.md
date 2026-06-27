@@ -4,6 +4,7 @@ As of v3.0.0 this project adheres to [Semantic Versioning](http://semver.org/). 
 
 ## [Unreleased][develop]
 ### Fixed
+- Fixed a bug on Unix where `os.spawn()` caused the child process to inherit all open file descriptors from LuaTeX, which could silently corrupt TeX's input state while compiling GABC files. Replaced with `io.popen()` (via `/bin/sh`) on Unix; `os.spawn()` is preserved on Windows where fd inheritance is not an issue. See [#1757](https://github.com/gregorio-project/gregorio/issues/1757).
 - Fixed a bug that could cause problems with headers/footers by generalizing the fix for fancyhdr (see [#1610](https://github.com/gregorio-project/gregorio/pull/1610) to work with any headers/footers. In particular, it fixes a similar problem with the `memoir` class. See [#1753](https://github.com/gregorio-project/gregorio/pull/1753).
 - Fixed some typos that would cause a handful of spaces to be scaled incorrectly. See [PR #1746](https://github.com/gregorio-project/gregorio/pull/1746).
 - Fixed a few bugs related to horizontal spacing around bars and clef changes. See issues [#1191](https://github.com/gregorio-project/gregorio/issues/1191), case 3 of [#1724](https://github.com/gregorio-project/gregorio/issues/1724), [PR #1743](https://github.com/gregorio-project/gregorio/pull/1743), and [#1745](https://github.com/gregorio-project/gregorio/issues/1745).
