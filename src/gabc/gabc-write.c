@@ -1196,9 +1196,12 @@ static void gabc_write_gregorio_syllable(FILE *f, gregorio_syllable *syllable,
         const gregorio_lyric_line *line;
         for (line = syllable->extra_lyrics; line; line = line->next) {
             fprintf(f, "|");
-            gregorio_write_text(WTP_NORMAL, line->text, f, &gabc_write_verb,
-                    &gabc_print_char, &gabc_write_begin, &gabc_write_end,
-                    &gabc_write_special_char);
+            if (line->text) {
+                gregorio_write_text(WTP_NORMAL, line->text, f,
+                        &gabc_write_verb, &gabc_print_char,
+                        &gabc_write_begin, &gabc_write_end,
+                        &gabc_write_special_char);
+            }
             if (line->position == WORD_END
                     || line->position == WORD_ONE_SYLLABLE) {
                 fprintf(f, " ");

@@ -379,14 +379,25 @@ ba|be (f)da|de(g)
 Here \texttt{be} and \texttt{de} are separate words on the second line
 (because of the space before \texttt{(f)}), while \texttt{ba} and
 \texttt{da} still belong to the same word on the main line.  A stacked word
-also ends when the following syllable with text does not carry the
-corresponding line (for example, when a plain syllable follows a stack).
-Automatic hyphens follow these per-line word boundaries, including at line
-breaks.
+also ends whenever the following syllable does not carry non-empty text on
+the corresponding line --- because that syllable does not reach that deep
+in the stack, because it is a plain syllable with no stack at all, or
+because the line is explicitly left empty there, as in \texttt{ca||ci(h)}
+(two consecutive pipes, skipping the second line for that syllable).  For
+instance:
 
-A line of the stack may be left empty (as in \texttt{ca||ci(h)}) to skip a
-level in that syllable.  Because the pipe starts a new lyric line, a
-literal \texttt{|} in syllable text must be escaped as \texttt{\$|}.
+\begin{verbatim}
+so|ve(h)le|ne(h)ni|ra(h)da|ção(h)de|(h)
+\end{verbatim}
+
+Here the second line reads \textit{veneração}: even though \texttt{ção} has
+no trailing space, it still ends the word, because the last syllable's
+second line is left empty --- so no automatic hyphen is generated after
+\texttt{ção}.  Automatic hyphens follow these per-line word boundaries,
+including at line breaks.
+
+Because the pipe starts a new lyric line, a literal \texttt{|} in syllable
+text must be escaped as \texttt{\$|}.
 
 \subsubsection{Special Characters}\label{specialcharacters}
 

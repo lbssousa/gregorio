@@ -543,21 +543,36 @@ static void save_stacked_text(void)
     }
 }
 
-/* closes the stacked words of the levels deeper than depth: called when a
- * syllable with text does not carry those levels (and at the end of the
- * score), since stacked words only continue across consecutive stacks */
-static void end_stacked_levels_beyond(int depth)
+/* closes the stacked words of the levels (2+) that have no non-empty text
+ * in the syllable currently being accumulated (first_extra_lyric, already
+ * fully built): called when a syllable with text is closed, and at the end
+ * of the score (where first_extra_lyric is empty, closing every level still
+ * open). A level counts as "not carrying" a word continuation not only when
+ * it is absent (the stack is shallower here, or there is no stack at all),
+ * but also when it is present yet left empty (e.g. "de|(h)", or the
+ * "skipped" level of "ca||ci(h)"): stacked words only continue across
+ * consecutive syllables that both have actual text at that level. */
+static void end_stacked_levels_without_text(void)
 {
     gregorio_lyric_line *line;
     int k;
-    for (k = (depth < 2 ? 2 : depth + 1); k <= GABC_MAX_LYRIC_LINES; k++) {
-        extra_position[k - 2] = WORD_BEGINNING;
-        extra_started_first_word[k - 2] = false;
+    bool has_text[GABC_MAX_LYRIC_LINES + 1];
+    for (k = 0; k <= GABC_MAX_LYRIC_LINES; k++) {
+        has_text[k] = false;
+    }
+    for (line = first_extra_lyric, k = 2; line; line = line->next, ++k) {
+        has_text[k] = (line->text != NULL);
+    }
+    for (k = 2; k <= GABC_MAX_LYRIC_LINES; k++) {
+        if (!has_text[k]) {
+            extra_position[k - 2] = WORD_BEGINNING;
+            extra_started_first_word[k - 2] = false;
+        }
     }
     if (last_text_syllable) {
         for (line = last_text_syllable->extra_lyrics, k = 2; line;
                 line = line->next, ++k) {
-            if (k > depth) {
+            if (!has_text[k]) {
                 if (line->position == WORD_MIDDLE) {
                     line->position = WORD_END;
                 } else if (line->position == WORD_BEGINNING) {
@@ -757,14 +772,24 @@ static void close_syllable(YYLTYPE *loc)
 
     if (first_text_character || first_extra_lyric) {
         /* a syllable with text ends the stacked words of the levels it does
-         * not carry: stacked words only continue across consecutive stacks */
-        end_stacked_levels_beyond(current_lyric_level);
+         * not carry non-empty text for: stacked words only continue across
+         * consecutive stacks */
+        end_stacked_levels_without_text();
     }
 
     /* compute the word position of each extra level */
     for (line = first_extra_lyric, k = 2; line; line = line->next, ++k) {
         int j = k - 2;
         char pos = extra_position[j];
+        if (line->text == NULL) {
+            /* an empty level carries no word of its own, and must not affect
+             * the running word-continuation state: leave it at whatever
+             * end_stacked_levels_without_text just reset it to (ready for a
+             * later, non-empty stack to start a fresh word at this level) */
+            line->position = WORD_ONE_SYLLABLE;
+            line->first_word = extra_started_first_word[j];
+            continue;
+        }
         if (explicit_break[k]) {
             pos = (pos == WORD_BEGINNING) ? WORD_ONE_SYLLABLE : WORD_END;
             extra_position[j] = WORD_BEGINNING;
@@ -855,7 +880,7 @@ gregorio_score *gabc_read_score(FILE *f_in, bool point_and_click)
      * initialized) */
     gabc_score_determination_parse();
     /* close the stacked lyric words still open at the end of the score */
-    end_stacked_levels_beyond(1);
+    end_stacked_levels_without_text();
     if (!score->legacy_oriscus_orientation) {
         gabc_determine_oriscus_orientation(score);
     }
