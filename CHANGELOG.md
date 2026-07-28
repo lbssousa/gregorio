@@ -11,6 +11,7 @@ As of v3.0.0 this project adheres to [Semantic Versioning](http://semver.org/). 
 - Fixed a bug in horizontal spacing before a soft alteration. See [PR #1761](https://github.com/gregorio-project/gregorio/pull/1761).
 
 ### Added
+- Support for multiple (stacked) lyric lines: `ba|be|bi(fg)` typesets `be` and `bi` on additional lyric lines below `ba`. Each line is centered under the notes independently and has its own word boundaries (the lower lines of consecutive stacks belong to the same word by default; a space before `|` or `(` ends the word at that line), with automatic hyphenation per line. The vertical separation between lines is controlled by the new `lyricstackseparation` distance. A literal `|` in syllable text must now be escaped as `$|`. See [#374](https://github.com/gregorio-project/gregorio/issues/374).
 - Code for several features related to horizontal spacing (spacing between non-bar syllables, syllable rewriting, clearing, and hyphenation) was moved into Lua. This results in some changes in horizontal spacing, which, if perceptible, should be improvements. See [#1720](https://github.com/gregorio-project/gregorio/issues/1720).
 
 ### Changed

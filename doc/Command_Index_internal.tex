@@ -1124,6 +1124,15 @@ Macro which stores the first part of the current syllable (that which comes befo
 \macroname{\textbackslash gre@middlesyllablepart}{}{gregoriotex-syllable.tex}
 Macro which stores the middle part of the current syllable (the part which aligns with the notes).
 
+\macroname{\textbackslash gre@lyricline@endpart}{}{gregoriotex-main.tex}
+Macro which stores the end part of the additional lyric line being typeset by \verb=\GreWriteLyricLine= (that which comes after the alignment part).
+
+\macroname{\textbackslash gre@lyricline@firstpart}{}{gregoriotex-main.tex}
+Macro which stores the first part of the additional lyric line being typeset by \verb=\GreWriteLyricLine= (that which comes before the alignment part).
+
+\macroname{\textbackslash gre@lyricline@middlepart}{}{gregoriotex-main.tex}
+Macro which stores the middle part of the additional lyric line being typeset by \verb=\GreWriteLyricLine= (the part which aligns with the notes).
+
 \macroname{\textbackslash gre@nextendsyllablepart}{}{gregoriotex-syllable.tex}
 Macro which stores the end part of the next syllable (that which comes after the alignment part).
 
@@ -2144,6 +2153,15 @@ Boolean indicating that the additional space needed between the notes and the ly
 
 \macroname{\textbackslash gre@count@stafflines}{}{gregoriotex-main.tex}
 Count containing the number of staff lines.
+
+\macroname{\textbackslash gre@count@lyriclines}{}{gregoriotex-main.tex}
+Count containing the number of lyric lines of the score (1 when the score has no stacked lyrics), as announced by \verb=\GreScoreLyricLines=.
+
+\macroname{\textbackslash gre@dimen@lyriclinecenter}{}{gregoriotex-main.tex}
+Dimension used by \verb=\GreWriteLyricLine= to hold the alignment center of the additional lyric line being typeset (the distance from the beginning of its letters to the middle of its middle part).
+
+\macroname{\textbackslash gre@dimen@lyriclineraise}{}{gregoriotex-main.tex}
+Dimension used by \verb=\GreWriteLyricLine= to hold the raise applied to the additional lyric line being typeset: \texttt{spacebeneathtext} minus (level $-$ 1) times \texttt{lyricstackseparation}.
 
 \macroname{\textbackslash ifgre@alteration@effect@note}{}{gregoriotex-signs.tex}
 Boolean indicating that soft alterations should last until they apply to a single note (i.e. all soft alterations will be printed).
