@@ -205,6 +205,7 @@ local function save_syllable_info(type)
   settings.showlyrics = gregoriotex.get_if('gre@showlyrics')
   settings.intersyllablespacestretchhyphen = string_to_glue(token.get_macro('gre@space@skip@intersyllablespacestretchhyphen'))
   settings.maximumspacewithoutdash = tex.sp(token.get_macro('gre@space@dimen@maximumspacewithoutdash'))
+  settings.interwordspacetext = string_to_glue(token.get_macro('gre@space@skip@interwordspacetext'))
   syllables[sid].settings = settings
 end
 
@@ -361,6 +362,12 @@ local function adjust_syllablefinalskip(cur, next)
   local min_shift = glue_max(min_text_shift, min_notes_shift)
 
   -- The additional lyric lines (stacked lyrics) must not collide either.
+  -- Each level has its own word position, independent of the main lyric
+  -- line, so the minimum distance required for that level's pairing must
+  -- be based on whether *that level* ends a word here (cl.dash), not on
+  -- cur.min_text_distance, which only reflects the main line's word
+  -- position and would otherwise let two different words on a lower line
+  -- (e.g. "Et" and "mi-" in a stacked psalm tone) end up touching.
   if cur.levels ~= nil and next.levels ~= nil then
     for lev, cl in pairs(cur.levels) do
       local nl = next.levels[lev]
@@ -369,7 +376,8 @@ local function adjust_syllablefinalskip(cur, next)
         local next_left = level_edges(nl.box)
         local level_distance = node.dimensions(cl.box.next, nl.box) - cur_right + next_left
         debugmessage('syllablespacing', '  lyric line %d distance = %s', lev, glue_to_string(level_distance))
-        local min_level_shift = glue_add(cur.min_text_distance, -level_distance)
+        local min_level_distance = (cl.dash == dash_endofword) and cur.settings.interwordspacetext or {0, 0, 0}
+        local min_level_shift = glue_add(min_level_distance, -level_distance)
         min_shift = glue_max(min_shift, min_level_shift)
       end
     end
