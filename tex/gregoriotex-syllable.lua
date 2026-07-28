@@ -518,24 +518,46 @@ local function syllable_spacing()
     end
 
     -- Hyphens for the additional lyric lines (stacked lyrics), with the
-    -- same distance rule as the level-1 text
+    -- same distance rule as the level-1 text.  Adding a hyphen to one line
+    -- widens it, and the following adjust_syllablefinalskip can then open
+    -- a gap in another line (whose distance was the binding constraint)
+    -- that needs a hyphen too, so iterate to a fixed point.  Each round
+    -- either adds at least one hyphen or stops, so this terminates.
     if cur.levels ~= nil and cur.settings.showlyrics then
-      local level_hyphen_added = false
-      for lev, cl in pairs(cur.levels) do
-        if cl.box ~= nil and cl.dash == dash_maybedash
-            and next ~= nil and next.levels ~= nil
-            and next.levels[lev] ~= nil and next.levels[lev].box ~= nil then
-          local _, cur_right = level_edges(cl.box)
-          local next_left = level_edges(next.levels[lev].box)
-          local level_distance = node.dimensions(cl.box.next, next.levels[lev].box) - cur_right + next_left
-          if level_distance > cur.settings.maximumspacewithoutdash then
-            add_level_hyphen(cur, lev)
-            level_hyphen_added = true
+      local added_this_round = true
+      while added_this_round do
+        added_this_round = false
+        -- the main lyric line
+        if (cur.text ~= nil and cur.dash == dash_maybedash and
+            next ~= nil and next.text ~= nil) then
+          local text_distance = (
+            node.dimensions(cur.text.next, cur.last.next) +
+            node.dimensions(next.first, next.text)
+          )
+          if text_distance > cur.settings.maximumspacewithoutdash then
+            debugmessage('hyphenation', 'adding hyphen to syllable %d', sid)
+            add_hyphen(cur)
+            added_this_round = true
           end
         end
-      end
-      if level_hyphen_added and cur.syllablefinalskip and next ~= nil and not next.barspacing1 then
-        adjust_syllablefinalskip(cur, next)
+        for lev, cl in pairs(cur.levels) do
+          if cl.box ~= nil and cl.dash == dash_maybedash
+              and next ~= nil and next.levels ~= nil
+              and next.levels[lev] ~= nil and next.levels[lev].box ~= nil then
+            local _, cur_right = level_edges(cl.box)
+            local next_left = level_edges(next.levels[lev].box)
+            local level_distance = node.dimensions(cl.box.next, next.levels[lev].box) - cur_right + next_left
+            debugmessage('hyphenation', 'syllable %d lyric line %d distance %.5fpt', sid, lev, level_distance/2^16)
+            if level_distance > cur.settings.maximumspacewithoutdash then
+              debugmessage('hyphenation', 'adding hyphen to lyric line %d of syllable %d', lev, sid)
+              add_level_hyphen(cur, lev)
+              added_this_round = true
+            end
+          end
+        end
+        if added_this_round and cur.syllablefinalskip and next ~= nil and not next.barspacing1 then
+          adjust_syllablefinalskip(cur, next)
+        end
       end
     end
   end
