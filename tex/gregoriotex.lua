@@ -686,6 +686,7 @@ local function compute_line_statistics(line, info)
       has_alt = false,
       has_nabc = false,
       has_blnabc = false,
+      max_lyric_level = 1,
       glyph_top = 7, -- e = \gre@pitch@dummy
       glyph_bottom = 7 -- e = \gre@pitch@dummy
     }
@@ -700,6 +701,12 @@ local function compute_line_statistics(line, info)
         info.has_nabc = true
       elseif has_attribute(n, part_attr, part_blnabc) then
         info.has_blnabc = true
+      elseif (has_attribute(n, part_attr) or 0) >= 11 then
+        -- additional lyric line (stacked lyrics): part is 9 + level
+        local level = has_attribute(n, part_attr) - 9
+        if level > (info.max_lyric_level or 1) then
+          info.max_lyric_level = level
+        end
       else
         if has_attribute(n, glyph_top_attr) then
           if info.glyph_top == nil or has_attribute(n, glyph_top_attr) > info.glyph_top then
@@ -784,6 +791,12 @@ local function adjust_additional_spaces(line, info, linenum)
     translation_height = get_per_line_space('translationheight')
   end
 
+  -- extra space needed by the additional lyric lines (stacked lyrics)
+  local lyric_stack_extra = 0
+  if info.max_lyric_level ~= nil and info.max_lyric_level > 1 then
+    lyric_stack_extra = (info.max_lyric_level - 1) * get_per_line_space('lyricstackseparation')
+  end
+
   -- per-line changes to other spaces
   local extra_space_lines_text = get_per_line_space('spacelinestext') - tex.sp(token.get_macro('gre@space@dimen@spacelinestext'))
   local extra_space_beneath_text = get_per_line_space('spacebeneathtext') - tex.sp(token.get_macro('gre@space@dimen@spacebeneathtext'))
@@ -845,7 +858,8 @@ local function adjust_additional_spaces(line, info, linenum)
     end
   end
   local lyrics_lower = blnabc_lower + extra_space_lines_text + additional_bottom_space
-  local translation_lower = lyrics_lower + translation_height
+  -- the translation goes below the whole stack of lyric lines
+  local translation_lower = lyrics_lower + lyric_stack_extra + translation_height
   local everything_raise = translation_lower + extra_space_beneath_text
 
   -- When the staff is collapsed, adjust the annotation position so it sits
@@ -907,6 +921,13 @@ local function adjust_additional_spaces(line, info, linenum)
         changed = true
       elseif child_part_attr == part_lyrics or child_part_attr == part_initial then
         debugmessage('adjust_additional_spaces', 'shift lyrics/initial down by %spt', lyrics_lower/2^16)
+        child.shift = child.shift + lyrics_lower
+        changed = true
+      elseif child_part_attr ~= nil and child_part_attr >= 11 then
+        -- additional lyric lines: the (level - 1) * lyricstackseparation
+        -- offset is already part of the box's raise, so they shift with
+        -- the level-1 lyrics
+        debugmessage('adjust_additional_spaces', 'shift lyric line %d down by %spt', child_part_attr - 9, lyrics_lower/2^16)
         child.shift = child.shift + lyrics_lower
         changed = true
       elseif child_part_attr == part_translation then
@@ -994,6 +1015,17 @@ local function add_eol_hyphen(line)
 
   if last_sid ~= nil then
     debugmessage('hyphenation', 'last syllable on line: %d', last_sid)
+    -- The additional lyric lines (stacked lyrics) of the last syllable also
+    -- get an end-of-line hyphen when their word continues.
+    local levels = gregoriotex.syllables[last_sid].levels
+    if levels ~= nil then
+      for lev, cl in pairs(levels) do
+        if cl.dash == dash_maybedash or cl.dash == dash_forced then
+          debugmessage('hyphenation', 'lyric line %d of syllable %d needs hyphen', lev, last_sid)
+          gregoriotex.add_level_hyphen(gregoriotex.syllables[last_sid], lev)
+        end
+      end
+    end
     -- Check if the last syllable needs a hyphen
     if (gregoriotex.syllables[last_sid].dash == dash_maybedash or
         gregoriotex.syllables[last_sid].dash == dash_forced) then
