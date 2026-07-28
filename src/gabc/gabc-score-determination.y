@@ -129,7 +129,7 @@ static bool protrusion_open;
 
 /* state for stacked lyrics (multiple lyric lines separated by "|");
  * GABC_MAX_LYRIC_LINES is the maximum total number of levels of a stack */
-#define GABC_MAX_LYRIC_LINES 16
+#define GABC_MAX_LYRIC_LINES 100
 /* the level currently being accumulated, 1-based (level 1 is the main
  * lyric line) */
 static unsigned char current_lyric_level;
