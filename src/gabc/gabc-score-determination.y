@@ -123,6 +123,30 @@ static gabc_style_bits styles;
 static bool generate_point_and_click;
 static bool clear_syllable_text;
 static bool has_protrusion;
+/* true while the ST_PROTRUSION style opened by add_protrusion or
+ * add_auto_protrusion has not been closed yet */
+static bool protrusion_open;
+
+/* state for stacked lyrics (multiple lyric lines separated by "|");
+ * GABC_MAX_LYRIC_LINES is the maximum total number of levels of a stack */
+#define GABC_MAX_LYRIC_LINES 100
+/* the level currently being accumulated, 1-based (level 1 is the main
+ * lyric line) */
+static unsigned char current_lyric_level;
+/* the additional lyric lines (levels 2+) of the current syllable */
+static gregorio_lyric_line *first_extra_lyric;
+static gregorio_lyric_line *last_extra_lyric;
+/* the last syllable that had text, for closing stacked words when a
+ * following syllable does not carry the corresponding level */
+static gregorio_syllable *last_text_syllable;
+/* running word position of each extra level, indexed by level - 2 */
+static char extra_position[GABC_MAX_LYRIC_LINES];
+/* per-extra-level equivalents of started_first_word, indexed by level - 2 */
+static bool extra_started_first_word[GABC_MAX_LYRIC_LINES];
+static bool extra_lyric_seen[GABC_MAX_LYRIC_LINES];
+/* whether the level (1-based index) of the current syllable ended with an
+ * explicit word break (a space before the following "|" or "(") */
+static bool explicit_break[GABC_MAX_LYRIC_LINES + 1];
 
 /* punctum_inclinatum_orientation maintains the running punctum inclinatum
  * orientation in order to decide if the glyph needs to be cut when a punctum
@@ -162,6 +186,19 @@ static void gabc_score_determination_error(const char *error_str)
 static void initialize_variables(bool point_and_click)
 {
     int i;
+    protrusion_open = false;
+    current_lyric_level = 1;
+    first_extra_lyric = NULL;
+    last_extra_lyric = NULL;
+    last_text_syllable = NULL;
+    for (i = 0; i < GABC_MAX_LYRIC_LINES; i++) {
+        extra_position[i] = WORD_BEGINNING;
+        extra_started_first_word[i] = false;
+        extra_lyric_seen[i] = false;
+    }
+    for (i = 0; i <= GABC_MAX_LYRIC_LINES; i++) {
+        explicit_break[i] = false;
+    }
     /* build a brand new empty score */
     score = gregorio_new_score();
     /* initialization of the first voice info to an empty voice info */
@@ -301,6 +338,7 @@ static void rebuild_score_characters(void)
         for (syllable = score->first_syllable; syllable;
                 syllable = syllable->next_syllable) {
             const gregorio_character *t;
+            gregorio_lyric_line *line;
 
             /* find out if there is a forced center */
             gregorio_center_determination center = CENTER_NOT_DETERMINED;
@@ -309,6 +347,25 @@ static void rebuild_score_characters(void)
                     syllable->forced_center = true;
                     center = CENTER_FULLY_DETERMINED;
                     break;
+                }
+            }
+
+            /* rebuild the extra lyric lines (levels 2+ of a stack), each
+             * with its own center determination */
+            for (line = syllable->extra_lyrics; line; line = line->next) {
+                gregorio_center_determination line_center =
+                        CENTER_NOT_DETERMINED;
+                for (t = line->text; t; t = t->next_character) {
+                    if (!t->is_character
+                            && t->cos.s.style == ST_FORCED_CENTER) {
+                        line->forced_center = true;
+                        line_center = CENTER_FULLY_DETERMINED;
+                        break;
+                    }
+                }
+                gregorio_rebuild_characters(&(line->text), line_center, false);
+                if (line->first_word) {
+                    gregorio_set_first_word(&(line->text));
                 }
             }
 
@@ -390,6 +447,14 @@ static void end_style(grestyle_style style, gabc_style_bits bit)
     gregorio_end_style(&current_character, style);
 }
 
+static void close_open_protrusion(void)
+{
+    if (protrusion_open) {
+        end_style(ST_PROTRUSION, SB_IGNORE);
+        protrusion_open = false;
+    }
+}
+
 static __inline void save_text(void)
 {
     if (has_protrusion) {
@@ -397,6 +462,110 @@ static __inline void save_text(void)
     }
     ready_characters();
     first_text_character = current_character;
+}
+
+/*
+ * Functions for stacked lyrics (multiple lyric lines separated by "|").
+ */
+
+/* strips the trailing spaces of the character list being accumulated,
+ * returning true if any space was removed; this detects the explicit word
+ * break marker (a space before "|" or "(") in a syllable stack */
+static bool strip_trailing_space(void)
+{
+    bool stripped = false;
+    while (current_character && current_character->is_character
+            && (current_character->cos.character == ' '
+            || current_character->cos.character == '\t')) {
+        gregorio_character *previous =
+                current_character->previous_character;
+        if (previous) {
+            previous->next_character = NULL;
+        }
+        free(current_character);
+        current_character = previous;
+        stripped = true;
+    }
+    return stripped;
+}
+
+/* finishes the lyric line currently being accumulated; called when a "|" is
+ * seen (next_level_follows = true) and for the last level of a stacked
+ * syllable when the syllable is closed (next_level_follows = false) */
+static void finish_lyric_level(bool next_level_follows)
+{
+    close_open_protrusion();
+    if (center_is_determined == CENTER_HALF_DETERMINED) {
+        gregorio_message("closing open syllable center at end of lyric line",
+                "det_score", VERBOSITY_WARNING, 0);
+        end_style(ST_FORCED_CENTER, SB_IGNORE);
+    }
+    explicit_break[current_lyric_level] = strip_trailing_space();
+    ready_characters();
+    if (current_lyric_level == 1) {
+        first_text_character = current_character;
+    } else {
+        int i = current_lyric_level - 2;
+        gregorio_lyric_line *line = (gregorio_lyric_line *)
+                gregorio_calloc(1, sizeof(gregorio_lyric_line));
+        line->text = current_character;
+        if (last_extra_lyric) {
+            last_extra_lyric->next = line;
+        } else {
+            first_extra_lyric = line;
+        }
+        last_extra_lyric = line;
+        if (!extra_lyric_seen[i]) {
+            extra_lyric_seen[i] = true;
+            extra_started_first_word[i] = true;
+        }
+    }
+    current_character = NULL;
+    center_is_determined = CENTER_NOT_DETERMINED;
+    if (next_level_follows) {
+        if (current_lyric_level >= GABC_MAX_LYRIC_LINES) {
+            gregorio_messagef("det_score", VERBOSITY_FATAL, 0,
+                    _("too many lyric lines; at most %d are supported"),
+                    GABC_MAX_LYRIC_LINES);
+        }
+        ++current_lyric_level;
+    }
+}
+
+/* saves the text of a syllable: level 1 only (a plain syllable, unchanged
+ * behavior) or the last level of a stack */
+static void save_stacked_text(void)
+{
+    if (current_lyric_level == 1) {
+        save_text();
+    } else {
+        finish_lyric_level(false);
+    }
+}
+
+/* closes the stacked words of the levels deeper than depth: called when a
+ * syllable with text does not carry those levels (and at the end of the
+ * score), since stacked words only continue across consecutive stacks */
+static void end_stacked_levels_beyond(int depth)
+{
+    gregorio_lyric_line *line;
+    int k;
+    for (k = (depth < 2 ? 2 : depth + 1); k <= GABC_MAX_LYRIC_LINES; k++) {
+        extra_position[k - 2] = WORD_BEGINNING;
+        extra_started_first_word[k - 2] = false;
+    }
+    if (last_text_syllable) {
+        for (line = last_text_syllable->extra_lyrics, k = 2; line;
+                line = line->next, ++k) {
+            if (k > depth) {
+                if (line->position == WORD_MIDDLE) {
+                    line->position = WORD_END;
+                } else if (line->position == WORD_BEGINNING) {
+                    line->position = WORD_ONE_SYLLABLE;
+                }
+            }
+        }
+    }
 }
 
 /* a function called when we see a [, basically, all characters are added to
@@ -459,6 +628,7 @@ static void add_protrusion(char *factor)
         end_style(ST_PROTRUSION_FACTOR, SB_IGNORE);
         add_style(ST_PROTRUSION, SB_IGNORE);
         has_protrusion = true;
+        protrusion_open = true;
     }
 }
 
@@ -509,13 +679,13 @@ static void add_auto_protrusion(char *protrusion)
  * Function to close a syllable and update the position.
  */
 
-static void close_syllable(YYLTYPE *loc)
+/* make sure any elisions that are opened are closed within one lyric line */
+static void check_elision_balance(const gregorio_character *const start)
 {
     int i = 0;
-    gregorio_character *ch;
+    const gregorio_character *ch;
 
-    /* make sure any elisions that are opened are closed within the syllable */
-    for (ch = first_text_character; ch; ch = ch->next_character) {
+    for (ch = start; ch; ch = ch->next_character) {
         if (!ch->is_character) {
             switch (ch->cos.s.style) {
             case ST_ELISION:
@@ -557,13 +727,65 @@ static void close_syllable(YYLTYPE *loc)
         }
     }
     /* the parser precludes this from failing here */
-    gregorio_assert_only(i == 0, close_syllable,
+    gregorio_assert_only(i == 0, check_elision_balance,
             "encountered elision beginning with no end");
+}
+
+/*
+ * Function to close a syllable and update the position.
+ */
+
+static void close_syllable(YYLTYPE *loc)
+{
+    int i;
+    int k;
+    gregorio_lyric_line *line;
+
+    check_elision_balance(first_text_character);
+    for (line = first_extra_lyric; line; line = line->next) {
+        check_elision_balance(line->text);
+    }
+
+    if (first_extra_lyric && explicit_break[1]) {
+        /* a space before the first "|" explicitly ends the level-1 word */
+        if (position == WORD_BEGINNING) {
+            position = WORD_ONE_SYLLABLE;
+        } else if (position == WORD_MIDDLE) {
+            position = WORD_END;
+        }
+    }
+
+    if (first_text_character || first_extra_lyric) {
+        /* a syllable with text ends the stacked words of the levels it does
+         * not carry: stacked words only continue across consecutive stacks */
+        end_stacked_levels_beyond(current_lyric_level);
+    }
+
+    /* compute the word position of each extra level */
+    for (line = first_extra_lyric, k = 2; line; line = line->next, ++k) {
+        int j = k - 2;
+        char pos = extra_position[j];
+        if (explicit_break[k]) {
+            pos = (pos == WORD_BEGINNING) ? WORD_ONE_SYLLABLE : WORD_END;
+            extra_position[j] = WORD_BEGINNING;
+        } else {
+            extra_position[j] = WORD_MIDDLE;
+        }
+        line->position = pos;
+        line->first_word = extra_started_first_word[j];
+        if (explicit_break[k]) {
+            extra_started_first_word[j] = false;
+        }
+    }
 
     gregorio_add_syllable(&current_syllable, number_of_voices, elements,
-            first_text_character, first_translation_character, position,
+            first_text_character, first_extra_lyric,
+            first_translation_character, position,
             abovelinestext, translation_type, no_linebreak_area, euouae, loc,
             started_first_word, clear_syllable_text);
+    if (first_text_character || first_extra_lyric) {
+        last_text_syllable = current_syllable;
+    }
     if (!score->first_syllable) {
         /* we rebuild the first syllable if we have to */
         score->first_syllable = current_syllable;
@@ -597,6 +819,13 @@ static void close_syllable(YYLTYPE *loc)
     current_element = NULL;
     clear_syllable_text = false;
     has_protrusion = false;
+    protrusion_open = false;
+    current_lyric_level = 1;
+    first_extra_lyric = NULL;
+    last_extra_lyric = NULL;
+    for (k = 0; k <= GABC_MAX_LYRIC_LINES; k++) {
+        explicit_break[k] = false;
+    }
 }
 
 void gabc_digest(const void *const buf, const size_t size)
@@ -625,6 +854,8 @@ gregorio_score *gabc_read_score(FILE *f_in, bool point_and_click)
     /* the flex/bison main call, it will build the score (that we have
      * initialized) */
     gabc_score_determination_parse();
+    /* close the stacked lyric words still open at the end of the score */
+    end_stacked_levels_beyond(1);
     if (!score->legacy_oriscus_orientation) {
         gabc_determine_oriscus_orientation(score);
     }
@@ -719,6 +950,7 @@ static char *concatenate(char *first, char *const second) {
 %token CENTER_BEGIN CENTER_END
 %token ELISION_BEGIN ELISION_END
 %token LYRIC_TIE
+%token LYRIC_CUT
 %token TRANSLATION_BEGIN TRANSLATION_END TRANSLATION_CENTER_END
 %token ALT_BEGIN ALT_END
 %token NLBA_B NLBA_E
@@ -1051,6 +1283,9 @@ character:
     | LYRIC_TIE {
         add_text(gregorio_strdup("~"));
     }
+    | LYRIC_CUT {
+        finish_lyric_level(true);
+    }
     | style_beginning
     | style_end
     | special_style_beginning
@@ -1120,59 +1355,59 @@ above_line_text:
 
 syllable_with_notes:
     text OPENING_BRACKET notes {
-        save_text();
+        save_stacked_text();
         close_syllable(&@1);
     }
     | HYPHEN OPENING_BRACKET notes {
         add_style(ST_VERBATIM, SB_IGNORE);
         add_text(gregorio_strdup("\\GreForceHyphen"));
         end_style(ST_VERBATIM, SB_IGNORE);
-        save_text();
+        save_stacked_text();
         close_syllable(&@1);
     }
     | text HYPHEN OPENING_BRACKET notes {
         add_style(ST_VERBATIM, SB_IGNORE);
         add_text(gregorio_strdup("\\GreForceHyphen"));
         end_style(ST_VERBATIM, SB_IGNORE);
-        save_text();
+        save_stacked_text();
         close_syllable(&@1);
     }
     | PROTRUDING_PUNCTUATION OPENING_BRACKET notes {
         add_auto_protrusion($1.text);
-        save_text();
+        save_stacked_text();
         close_syllable(&@1);
     }
     | text PROTRUDING_PUNCTUATION OPENING_BRACKET notes {
         add_auto_protrusion($2.text);
-        save_text();
+        save_stacked_text();
         close_syllable(&@1);
     }
     | text translation OPENING_BRACKET notes {
-        save_text();
+        save_stacked_text();
         close_syllable(&@1);
     }
     | HYPHEN translation OPENING_BRACKET notes {
         add_style(ST_VERBATIM, SB_IGNORE);
         add_text(gregorio_strdup("\\GreForceHyphen"));
         end_style(ST_VERBATIM, SB_IGNORE);
-        save_text();
+        save_stacked_text();
         close_syllable(&@1);
     }
     | text HYPHEN translation OPENING_BRACKET notes {
         add_style(ST_VERBATIM, SB_IGNORE);
         add_text(gregorio_strdup("\\GreForceHyphen"));
         end_style(ST_VERBATIM, SB_IGNORE);
-        save_text();
+        save_stacked_text();
         close_syllable(&@1);
     }
     | PROTRUDING_PUNCTUATION translation OPENING_BRACKET notes {
         add_auto_protrusion($1.text);
-        save_text();
+        save_stacked_text();
         close_syllable(&@1);
     }
     | text PROTRUDING_PUNCTUATION translation OPENING_BRACKET notes {
         add_auto_protrusion($2.text);
-        save_text();
+        save_stacked_text();
         close_syllable(&@1);
     }
     ;

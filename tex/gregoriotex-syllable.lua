@@ -33,6 +33,7 @@ local temp = node.id('temp')
 local disc = node.id('disc')
 local glyph = node.id('glyph')
 local whatsit = node.id('whatsit')
+local hlist = node.id('hlist')
 
 local syllable_id_attr = luatexbase.attributes['gre@attr@syllable@id']
 
@@ -50,6 +51,7 @@ local skip_type_clearsyllable = 5
 --- Possible values of syllables[sid].dash
 local dash_maybedash = 1
 local dash_hasdash = 2
+local dash_endofword = 3
 local dash_forced = 5
 
 -- Functions for manipulating glue, which we just store as a 3-tuple
@@ -174,6 +176,21 @@ local function current_syllable()
   return syllables[sid]
 end
 
+--- Record hyphenation information about one additional lyric line (level 2+)
+--- of the current syllable, called from \GreWriteLyricLine.
+--- @param level number The lyric line level (2 for the first additional line).
+--- @param end_of_word number 1 if this level ends a word here, else 0.
+local function set_lyric_line_dash(level, end_of_word)
+  local cur = current_syllable()
+  if cur.levels == nil then cur.levels = {} end
+  if cur.levels[level] == nil then cur.levels[level] = {} end
+  if end_of_word == 1 then
+    cur.levels[level].dash = dash_endofword
+  else
+    cur.levels[level].dash = dash_maybedash
+  end
+end
+
 --- Save information about syllables that is impossible or
 --- inconvenient to recover from node attributes.
 --- @param type string Type of syllable ('bar' or 'note')
@@ -231,6 +248,11 @@ end
 local function scan_syllables(head)
   for _, cur in pairs(syllables) do
     cur.first_note = nil
+    if cur.levels ~= nil then
+      for _, cl in pairs(cur.levels) do
+        cl.box = nil
+      end
+    end
   end
   local prev_sid
   local function visit(head)
@@ -269,7 +291,13 @@ local function scan_syllables(head)
               syllables[sid].first_note = n
             end
             syllables[sid].last_note = n
-          elseif skip_type == skip_type_before_test then
+          elseif part ~= nil and part >= 11 then
+            -- additional lyric line (stacked lyrics): part is 9 + level
+            local lev = part - 9
+            if syllables[sid].levels == nil then syllables[sid].levels = {} end
+            if syllables[sid].levels[lev] == nil then syllables[sid].levels[lev] = {} end
+            syllables[sid].levels[lev].box = n
+          elseif skip_type == skip_type_before_text then
             syllables[sid].before_text_skip = n
           elseif skip_type == skip_type_text_notes then
             syllables[sid].text_notes_skip = n
@@ -285,6 +313,24 @@ local function scan_syllables(head)
     end
   end
   visit(head)
+end
+
+--- Compute the left and right edges of an additional lyric line's text,
+--- relative to the position of its zero-width outer box.  The outer box
+--- contains a centering kern followed by the inner text hbox.
+--- @param box node The outer hbox of the lyric line.
+--- @return number The left edge, in sp.
+--- @return number The right edge, in sp.
+local function level_edges(box)
+  local left = 0
+  for m in node.traverse(box.head) do
+    if m.id == kern then
+      left = left + m.kern
+    elseif m.id == hlist then
+      return left, left + m.width
+    end
+  end
+  return left, left
 end
 
 --- Determine the width of a syllable's syllable-final skip, which is
@@ -312,9 +358,26 @@ local function adjust_syllablefinalskip(cur, next)
   local min_notes_shift = glue_add(min_notes_distance, -notes_distance)
   debugmessage('syllablespacing', '  min notes shift = %s', glue_to_string(min_notes_shift))
   
+  local min_shift = glue_max(min_text_shift, min_notes_shift)
+
+  -- The additional lyric lines (stacked lyrics) must not collide either.
+  if cur.levels ~= nil and next.levels ~= nil then
+    for lev, cl in pairs(cur.levels) do
+      local nl = next.levels[lev]
+      if cl.box ~= nil and nl ~= nil and nl.box ~= nil then
+        local _, cur_right = level_edges(cl.box)
+        local next_left = level_edges(nl.box)
+        local level_distance = node.dimensions(cl.box.next, nl.box) - cur_right + next_left
+        debugmessage('syllablespacing', '  lyric line %d distance = %s', lev, glue_to_string(level_distance))
+        local min_level_shift = glue_add(cur.min_text_distance, -level_distance)
+        min_shift = glue_max(min_shift, min_level_shift)
+      end
+    end
+  end
+
   local syllablefinalskip = {cur.syllablefinalskip.width, cur.syllablefinalskip.stretch, cur.syllablefinalskip.shrink}
   -- Ensure that min text shift and min notes shift are satisfied.
-  syllablefinalskip = glue_add(syllablefinalskip, glue_max(min_text_shift, min_notes_shift))
+  syllablefinalskip = glue_add(syllablefinalskip, min_shift)
   -- If this syllable has a hyphen, add some additional stretch.
   -- Note: This happens even if there is no text (\gresetlyrics{invisible}).
   if cur.text and cur.dash == dash_hasdash then
@@ -385,6 +448,36 @@ local function add_hyphen(cur)
   -- bar, then the bar will have the wrong previousenddifference.
 end
 
+--- Add a hyphen to the end of one additional lyric line (stacked lyrics)
+--- of a syllable.  Since the outer box has zero width, only the inner text
+--- hbox needs to grow; horizontal spacing is fixed up separately by
+--- adjust_syllablefinalskip.
+--- @param cur table The current syllable.
+--- @param lev number The lyric line level (2 for the first additional line).
+local function add_level_hyphen(cur, lev)
+  local box = cur.levels[lev] and cur.levels[lev].box
+  if box == nil then return end
+  local inner
+  for m in node.traverse(box.head) do
+    if m.id == hlist then
+      inner = m
+      break
+    end
+  end
+  if inner == nil then return end
+  local g = node.new(glyph)
+  g.font = cur.font
+  g.char = gregoriotex.hyphen
+  if inner.head == nil then
+    inner.head = g
+  else
+    node.insert_after(inner.head, node.tail(inner.head), g)
+  end
+  inner.head = shaping(inner.head)
+  inner.width = node.rangedimensions(inner, inner.head)
+  cur.levels[lev].dash = dash_hasdash
+end
+
 --- Determine the width of all syllables' horizontal spacing.
 local function syllable_spacing()
   for sid, cur in pairs(syllables) do
@@ -421,6 +514,50 @@ local function syllable_spacing()
       -- Since adding the hyphen made cur wider, recompute syllablefinalskip
       if cur.syllablefinalskip and next ~= nil and not next.barspacing1 then
         adjust_syllablefinalskip(cur, next)
+      end
+    end
+
+    -- Hyphens for the additional lyric lines (stacked lyrics), with the
+    -- same distance rule as the level-1 text.  Adding a hyphen to one line
+    -- widens it, and the following adjust_syllablefinalskip can then open
+    -- a gap in another line (whose distance was the binding constraint)
+    -- that needs a hyphen too, so iterate to a fixed point.  Each round
+    -- either adds at least one hyphen or stops, so this terminates.
+    if cur.levels ~= nil and cur.settings.showlyrics then
+      local added_this_round = true
+      while added_this_round do
+        added_this_round = false
+        -- the main lyric line
+        if (cur.text ~= nil and cur.dash == dash_maybedash and
+            next ~= nil and next.text ~= nil) then
+          local text_distance = (
+            node.dimensions(cur.text.next, cur.last.next) +
+            node.dimensions(next.first, next.text)
+          )
+          if text_distance > cur.settings.maximumspacewithoutdash then
+            debugmessage('hyphenation', 'adding hyphen to syllable %d', sid)
+            add_hyphen(cur)
+            added_this_round = true
+          end
+        end
+        for lev, cl in pairs(cur.levels) do
+          if cl.box ~= nil and cl.dash == dash_maybedash
+              and next ~= nil and next.levels ~= nil
+              and next.levels[lev] ~= nil and next.levels[lev].box ~= nil then
+            local _, cur_right = level_edges(cl.box)
+            local next_left = level_edges(next.levels[lev].box)
+            local level_distance = node.dimensions(cl.box.next, next.levels[lev].box) - cur_right + next_left
+            debugmessage('hyphenation', 'syllable %d lyric line %d distance %.5fpt', sid, lev, level_distance/2^16)
+            if level_distance > cur.settings.maximumspacewithoutdash then
+              debugmessage('hyphenation', 'adding hyphen to lyric line %d of syllable %d', lev, sid)
+              add_level_hyphen(cur, lev)
+              added_this_round = true
+            end
+          end
+        end
+        if added_this_round and cur.syllablefinalskip and next ~= nil and not next.barspacing1 then
+          adjust_syllablefinalskip(cur, next)
+        end
       end
     end
   end
@@ -517,6 +654,7 @@ local function syllable_rewriting()
 end
 
 gregoriotex.save_syllable_info = save_syllable_info
+gregoriotex.set_lyric_line_dash = set_lyric_line_dash
 gregoriotex.save_syllable_texts = save_syllable_texts
 gregoriotex.save_min_distances = save_min_distances
 gregoriotex.current_syllable = current_syllable
@@ -526,3 +664,4 @@ gregoriotex.syllable_spacing = syllable_spacing
 gregoriotex.syllable_clearing = syllable_clearing
 gregoriotex.syllable_rewriting = syllable_rewriting
 gregoriotex.add_hyphen = add_hyphen
+gregoriotex.add_level_hyphen = add_level_hyphen

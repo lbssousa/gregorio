@@ -311,7 +311,9 @@ These tags allow for a variety of special effects.
 Additionally, besides parentheses, there are a few other special characters in
 the syllable text.  Curly braces (\texttt{\{} and \texttt{\}}) are for
 \nameref{lyriccentering}.  Square brackets (\texttt{[} and \texttt{]}) are for
-\nameref{translationtext} that appears below the lyric text.  The tilde
+\nameref{translationtext} that appears below the lyric text.  The pipe
+(\texttt{|}) separates \nameref{multiplelyriclines}; a literal pipe must be
+escaped as \texttt{\$|}.  The tilde
 (\texttt{\textasciitilde}) produces a lyric tie, which is configurable via
 \verb=\gresetlyrictie= (default: \greundertie).  See the sections below for more
 information.
@@ -341,6 +343,50 @@ appears below the lyric text (by default) in italics.  It is aligned to the
 syllable where it appears in the gabc file unless the special sequence
 \texttt{[/]} appears in a later syllable indicating that the translation text
 should be centered between those two points.
+
+\subsubsection{Multiple Lyric Lines}\label{multiplelyriclines}
+
+A syllable may carry several stacked lines of lyrics, separated by pipes
+(\texttt{|}) in the syllable text:
+
+\begin{verbatim}
+San|Al(f)ctus|le(g)Do|lu(h)mi|ia(g)nus(f)
+\end{verbatim}
+
+The text before the first pipe is the main (first) lyric line; each
+subsequent pipe starts one line further below the staff.  Each line of the
+stack is centered under the notes independently, following the current
+\nameref{lyriccentering} mode (including forced centering with curly
+braces, which may be used separately in each line).  Corresponding lines of
+neighboring syllables share a common baseline, and the vertical separation
+between lines is controlled by the \texttt{lyricstackseparation} distance.
+The translation text, if any, is placed below the whole stack.
+
+Word boundaries are determined per line.  The main line follows the usual
+rule: a space after the parenthesized notes ends the word.  The lower lines
+(second and following) of two \emph{consecutive} stacked syllables are
+considered syllables of the same word by default, even when the main-line
+word ends in between.  In the example above, \texttt{Al-le-lu-ia} is a
+single word on the second line, while \texttt{San-ctus} and
+\texttt{Do-mi-nus} are words on the main line.  To end a word on a lower
+line explicitly, insert a space between the text and the following pipe or
+opening parenthesis, for instance:
+
+\begin{verbatim}
+ba|be (f)da|de(g)
+\end{verbatim}
+
+Here \texttt{be} and \texttt{de} are separate words on the second line
+(because of the space before \texttt{(f)}), while \texttt{ba} and
+\texttt{da} still belong to the same word on the main line.  A stacked word
+also ends when the following syllable with text does not carry the
+corresponding line (for example, when a plain syllable follows a stack).
+Automatic hyphens follow these per-line word boundaries, including at line
+breaks.
+
+A line of the stack may be left empty (as in \texttt{ca||ci(h)}) to skip a
+level in that syllable.  Because the pipe starts a new lyric line, a
+literal \texttt{|} in syllable text must be escaped as \texttt{\$|}.
 
 \subsubsection{Special Characters}\label{specialcharacters}
 

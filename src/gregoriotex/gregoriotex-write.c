@@ -3580,6 +3580,42 @@ static void write_text(FILE *const f, const gregorio_character *const text)
     fprintf(f, "}");
 }
 
+/* writes the additional lyric lines (levels 2+) of a stacked syllable, as
+ * \GreWriteLyricLine{level}{end-of-word}{forced-center}{pre}{center}{post}
+ * {first-letter}{rest}; this goes into the eighth argument of \GreSyllable,
+ * like the translation */
+static void write_extra_lyric_lines(FILE *const f,
+        const gregorio_syllable *const syllable)
+{
+    const gregorio_lyric_line *line;
+    int level = 2;
+    /* the fixed-style optimization only applies to the level-1 text; make
+     * sure the styles of the extra lines are written in full */
+    const grestyle_style saved_ignore_style = gregoriotex_ignore_style;
+    gregoriotex_ignore_style = ST_NO_STYLE;
+    for (line = syllable->extra_lyrics; line; line = line->next, ++level) {
+        fprintf(f, "%%\n\\GreWriteLyricLine{%d}{%d}{%d}", level,
+                (line->position == WORD_END
+                        || line->position == WORD_ONE_SYLLABLE) ? 1 : 0,
+                line->forced_center ? 1 : 0);
+        if (line->text == NULL) {
+            fprintf(f, "{}{}{}{}{}");
+        } else {
+            fprintf(f, "{");
+            gregorio_write_text(WTP_NORMAL, line->text, f, &gtex_write_verb,
+                    &gtex_print_char, &gtex_write_begin, &gtex_write_end,
+                    &gtex_write_special_char);
+            fprintf(f, "}{");
+            gregorio_write_first_letter_alignment_text(WTP_NORMAL, line->text,
+                    f, &gtex_write_verb, &gtex_print_char, &gtex_write_begin,
+                    &gtex_write_end, &gtex_write_special_char);
+            fprintf(f, "}");
+        }
+        fprintf(f, "%%\n");
+    }
+    gregoriotex_ignore_style = saved_ignore_style;
+}
+
 /*
  * Function printing the line clef change (only updating \localleftbox, not
  * printing the key). Useful for \GreDiscretionary.
@@ -4184,6 +4220,9 @@ static void write_syllable(FILE *f, gregorio_syllable *syllable,
         fprintf(f, "%%\n\\GreSetTextAboveLines{%s}%%\n",
                 syllable->abovelinestext);
     }
+    if (syllable->extra_lyrics) {
+        write_extra_lyric_lines(f, syllable);
+    }
     fprintf(f, "}{%%\n");
 
     fprintf(f, "\\GreSyllableNoteCount{%u}%%\n", syllable->elements?
@@ -4699,6 +4738,25 @@ void gregoriotex_write_score(FILE *const f, gregorio_score *const score,
             score->staff_lines);
     if (score->nabc_lines) {
         fprintf(f, "\\GreScoreNABCLines{%d}", (int)score->nabc_lines);
+    }
+    {
+        /* tell TeX how many lyric lines the score has, so that the stacked
+         * lyrics machinery is only activated when needed */
+        int max_lyric_lines = 1;
+        const gregorio_syllable *s;
+        for (s = score->first_syllable; s; s = s->next_syllable) {
+            const gregorio_lyric_line *line;
+            int n = 1;
+            for (line = s->extra_lyrics; line; line = line->next) {
+                ++n;
+            }
+            if (n > max_lyric_lines) {
+                max_lyric_lines = n;
+            }
+        }
+        if (max_lyric_lines > 1) {
+            fprintf(f, "\\GreScoreLyricLines{%d}%%\n", max_lyric_lines);
+        }
     }
     if (score->annotation[0]) {
         fprintf(f, "\\GreAnnotationLines");
