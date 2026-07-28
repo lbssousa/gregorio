@@ -1189,6 +1189,22 @@ static void gabc_write_gregorio_syllable(FILE *f, gregorio_syllable *syllable,
                 &gabc_print_char, &gabc_write_begin, &gabc_write_end,
                 &gabc_write_special_char);
     }
+    if (syllable->extra_lyrics) {
+        /* the additional lyric lines of a stacked syllable; a space before
+         * "|" or "(" marks an explicit word break at the level ending
+         * there */
+        const gregorio_lyric_line *line;
+        for (line = syllable->extra_lyrics; line; line = line->next) {
+            fprintf(f, "|");
+            gregorio_write_text(WTP_NORMAL, line->text, f, &gabc_write_verb,
+                    &gabc_print_char, &gabc_write_begin, &gabc_write_end,
+                    &gabc_write_special_char);
+            if (line->position == WORD_END
+                    || line->position == WORD_ONE_SYLLABLE) {
+                fprintf(f, " ");
+            }
+        }
+    }
     if (syllable->translation) {
         fprintf(f, "[");
         gregorio_write_text(WTP_NORMAL, syllable->translation, f,
