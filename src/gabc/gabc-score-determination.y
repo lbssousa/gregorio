@@ -144,9 +144,9 @@ static char extra_position[GABC_MAX_LYRIC_LINES];
 /* per-extra-level equivalents of started_first_word, indexed by level - 2 */
 static bool extra_started_first_word[GABC_MAX_LYRIC_LINES];
 static bool extra_lyric_seen[GABC_MAX_LYRIC_LINES];
-/* whether the level (1-based index) of the current syllable ended with an
- * explicit word break (a space before the following "|" or "(") */
-static bool explicit_break[GABC_MAX_LYRIC_LINES + 1];
+/* whether the line of the syllable being accumulated started with a space,
+ * which begins a new word on that line, indexed by level - 2 */
+static bool extra_new_word[GABC_MAX_LYRIC_LINES];
 
 /* punctum_inclinatum_orientation maintains the running punctum inclinatum
  * orientation in order to decide if the glyph needs to be cut when a punctum
@@ -195,9 +195,7 @@ static void initialize_variables(bool point_and_click)
         extra_position[i] = WORD_BEGINNING;
         extra_started_first_word[i] = false;
         extra_lyric_seen[i] = false;
-    }
-    for (i = 0; i <= GABC_MAX_LYRIC_LINES; i++) {
-        explicit_break[i] = false;
+        extra_new_word[i] = false;
     }
     /* build a brand new empty score */
     score = gregorio_new_score();
@@ -468,22 +466,35 @@ static __inline void save_text(void)
  * Functions for stacked lyrics (multiple lyric lines separated by "|").
  */
 
-/* strips the trailing spaces of the character list being accumulated,
- * returning true if any space was removed; this detects the explicit word
- * break marker (a space before "|" or "(") in a syllable stack */
-static bool strip_trailing_space(void)
+/* strips the leading spaces of the text of a lyric line, returning true if
+ * any space was removed.  A space at the beginning of a line of a syllable
+ * marks the beginning of a new word on that line.  This is the same rule the
+ * main lyric line follows: there, the space that precedes a syllable is the
+ * one the lexer attaches to the closing parenthesis of the previous syllable
+ * (CLOSING_BRACKET_WITH_SPACE); here the space follows a "|" instead, so it
+ * lands at the head of the line's own text. */
+static bool strip_leading_space(gregorio_character **const first)
 {
     bool stripped = false;
-    while (current_character && current_character->is_character
-            && (current_character->cos.character == ' '
-            || current_character->cos.character == '\t')) {
-        gregorio_character *previous =
-                current_character->previous_character;
-        if (previous) {
-            previous->next_character = NULL;
+    gregorio_character *ch = *first;
+    /* the styles left open by the previous line come before the text */
+    while (ch && !ch->is_character) {
+        ch = ch->next_character;
+    }
+    while (ch && ch->is_character && (ch->cos.character == ' '
+                || ch->cos.character == '\t')) {
+        gregorio_character *const next = ch->next_character;
+        if (ch->previous_character) {
+            ch->previous_character->next_character = next;
         }
-        free(current_character);
-        current_character = previous;
+        if (next) {
+            next->previous_character = ch->previous_character;
+        }
+        if (ch == *first) {
+            *first = next;
+        }
+        free(ch);
+        ch = next;
         stripped = true;
     }
     return stripped;
@@ -500,7 +511,6 @@ static void finish_lyric_level(bool next_level_follows)
                 "det_score", VERBOSITY_WARNING, 0);
         end_style(ST_FORCED_CENTER, SB_IGNORE);
     }
-    explicit_break[current_lyric_level] = strip_trailing_space();
     ready_characters();
     if (current_lyric_level == 1) {
         first_text_character = current_character;
@@ -508,6 +518,7 @@ static void finish_lyric_level(bool next_level_follows)
         int i = current_lyric_level - 2;
         gregorio_lyric_line *line = (gregorio_lyric_line *)
                 gregorio_calloc(1, sizeof(gregorio_lyric_line));
+        extra_new_word[i] = strip_leading_space(&current_character);
         line->text = current_character;
         if (last_extra_lyric) {
             last_extra_lyric->next = line;
@@ -543,15 +554,45 @@ static void save_stacked_text(void)
     }
 }
 
-/* closes the stacked words of the levels (2+) that have no non-empty text
- * in the syllable currently being accumulated (first_extra_lyric, already
- * fully built): called when a syllable with text is closed, and at the end
- * of the score (where first_extra_lyric is empty, closing every level still
- * open). A level counts as "not carrying" a word continuation not only when
- * it is absent (the stack is shallower here, or there is no stack at all),
- * but also when it is present yet left empty (e.g. "de|(h)", or the
- * "skipped" level of "ca||ci(h)"): stacked words only continue across
- * consecutive syllables that both have actual text at that level. */
+/* closes the stacked word of one line (level 2+): the word that line was
+ * spelling, if any, ended on the last syllable that carried it, so that
+ * syllable's line becomes the end of the word, and a fresh word starts here.
+ * This is the single place where a stacked word ends; every rule that ends
+ * one (a line starting a new word with a leading space, a line the next
+ * syllable does not carry, and the end of the score) goes through it. */
+static void close_stacked_word_at_level(const int level)
+{
+    const int j = level - 2;
+    if (last_text_syllable) {
+        gregorio_lyric_line *line;
+        int k;
+        for (line = last_text_syllable->extra_lyrics, k = 2; line;
+                line = line->next, ++k) {
+            if (k == level) {
+                if (line->text) {
+                    if (line->position == WORD_MIDDLE) {
+                        line->position = WORD_END;
+                    } else if (line->position == WORD_BEGINNING) {
+                        line->position = WORD_ONE_SYLLABLE;
+                    }
+                    /* if that was the first word of the line, it is over */
+                    extra_started_first_word[j] = false;
+                }
+                break;
+            }
+        }
+    }
+    extra_position[j] = WORD_BEGINNING;
+}
+
+/* closes the stacked words of the lines (2+) that the syllable being closed
+ * carries no text for: called when a syllable with text is closed, and at the
+ * end of the score (where first_extra_lyric is empty, so every line still
+ * open gets closed).  A line counts as not carrying the word forward when it
+ * is absent (the stack is shallower here, or there is no stack at all) and
+ * also when it is present but left empty (e.g. "de|(h)", or the skipped line
+ * of "ca||ci(h)"): stacked words only continue across consecutive syllables
+ * that both have actual text on that line. */
 static void end_stacked_levels_without_text(void)
 {
     gregorio_lyric_line *line;
@@ -565,20 +606,7 @@ static void end_stacked_levels_without_text(void)
     }
     for (k = 2; k <= GABC_MAX_LYRIC_LINES; k++) {
         if (!has_text[k]) {
-            extra_position[k - 2] = WORD_BEGINNING;
-            extra_started_first_word[k - 2] = false;
-        }
-    }
-    if (last_text_syllable) {
-        for (line = last_text_syllable->extra_lyrics, k = 2; line;
-                line = line->next, ++k) {
-            if (!has_text[k]) {
-                if (line->position == WORD_MIDDLE) {
-                    line->position = WORD_END;
-                } else if (line->position == WORD_BEGINNING) {
-                    line->position = WORD_ONE_SYLLABLE;
-                }
-            }
+            close_stacked_word_at_level(k);
         }
     }
 }
@@ -761,45 +789,32 @@ static void close_syllable(YYLTYPE *loc)
         check_elision_balance(line->text);
     }
 
-    if (first_extra_lyric && explicit_break[1]) {
-        /* a space before the first "|" explicitly ends the level-1 word */
-        if (position == WORD_BEGINNING) {
-            position = WORD_ONE_SYLLABLE;
-        } else if (position == WORD_MIDDLE) {
-            position = WORD_END;
-        }
-    }
-
     if (first_text_character || first_extra_lyric) {
-        /* a syllable with text ends the stacked words of the levels it does
-         * not carry non-empty text for: stacked words only continue across
-         * consecutive stacks */
+        /* a line that starts a new word here ends the word it was spelling on
+         * the previous syllable, and so does a line this syllable carries no
+         * text for */
+        for (line = first_extra_lyric, k = 2; line; line = line->next, ++k) {
+            if (line->text && extra_new_word[k - 2]) {
+                close_stacked_word_at_level(k);
+            }
+        }
         end_stacked_levels_without_text();
     }
 
-    /* compute the word position of each extra level */
+    /* the word position of each extra level; only the beginnings and middles
+     * of the words are known here, the ends being filled in retroactively by
+     * close_stacked_word_at_level */
     for (line = first_extra_lyric, k = 2; line; line = line->next, ++k) {
-        int j = k - 2;
-        char pos = extra_position[j];
-        if (line->text == NULL) {
-            /* an empty level carries no word of its own, and must not affect
-             * the running word-continuation state: leave it at whatever
-             * end_stacked_levels_without_text just reset it to (ready for a
-             * later, non-empty stack to start a fresh word at this level) */
-            line->position = WORD_ONE_SYLLABLE;
-            line->first_word = extra_started_first_word[j];
-            continue;
-        }
-        if (explicit_break[k]) {
-            pos = (pos == WORD_BEGINNING) ? WORD_ONE_SYLLABLE : WORD_END;
-            extra_position[j] = WORD_BEGINNING;
-        } else {
-            extra_position[j] = WORD_MIDDLE;
-        }
-        line->position = pos;
+        const int j = k - 2;
         line->first_word = extra_started_first_word[j];
-        if (explicit_break[k]) {
-            extra_started_first_word[j] = false;
+        if (line->text == NULL) {
+            /* an empty line spells no word of its own, and leaves the running
+             * word state as close_stacked_word_at_level just reset it, ready
+             * for a later syllable to start a fresh word on this line */
+            line->position = WORD_ONE_SYLLABLE;
+        } else {
+            line->position = extra_position[j];
+            extra_position[j] = WORD_MIDDLE;
         }
     }
 
@@ -848,8 +863,8 @@ static void close_syllable(YYLTYPE *loc)
     current_lyric_level = 1;
     first_extra_lyric = NULL;
     last_extra_lyric = NULL;
-    for (k = 0; k <= GABC_MAX_LYRIC_LINES; k++) {
-        explicit_break[k] = false;
+    for (k = 0; k < GABC_MAX_LYRIC_LINES; k++) {
+        extra_new_word[k] = false;
     }
 }
 

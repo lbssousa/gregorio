@@ -362,23 +362,25 @@ neighboring syllables share a common baseline, and the vertical separation
 between lines is controlled by the \texttt{lyricstackseparation} distance.
 The translation text, if any, is placed below the whole stack.
 
-Word boundaries are determined per line.  The main line follows the usual
-rule: a space after the parenthesized notes ends the word.  The lower lines
-(second and following) of two \emph{consecutive} stacked syllables are
-considered syllables of the same word by default, even when the main-line
-word ends in between.  In the example above, \texttt{Al-le-lu-ia} is a
-single word on the second line, while \texttt{San-ctus} and
-\texttt{Do-mi-nus} are words on the main line.  To end a word on a lower
-line explicitly, insert a space between the text and the following pipe or
-opening parenthesis, for instance:
+Word boundaries are determined per line, by the same rule on every line: a
+space before the text of a syllable starts a new word on that line.  On the
+main line this is the familiar gabc rule, the space sitting between the
+closing parenthesis of the previous syllable and the text of this one; on
+the lines of a stack, the space goes right after the pipe that starts the
+line.  Without such a space, the lower lines (second and following) of two
+\emph{consecutive} stacked syllables are considered syllables of the same
+word, even when the main-line word ends in between.  In the example above,
+\texttt{Al-le-lu-ia} is a single word on the second line, while
+\texttt{San-ctus} and \texttt{Do-mi-nus} are words on the main line.
+Another example:
 
 \begin{verbatim}
-ba|be (f)da|de(g)
+ca|ba(h)ra|la(h)me| bo(h)lo|lo(h)
 \end{verbatim}
 
-Here \texttt{be} and \texttt{de} are separate words on the second line
-(because of the space before \texttt{(f)}), while \texttt{ba} and
-\texttt{da} still belong to the same word on the main line.  A stacked word
+Here the main line is the single word \textit{caramelo}, while the second
+line holds two words, \textit{bala} and \textit{bolo}: the space before
+\texttt{bo} starts the second one.  A stacked word
 also ends whenever the following syllable does not carry non-empty text on
 the corresponding line --- because that syllable does not reach that deep
 in the stack, because it is a plain syllable with no stack at all, or
@@ -390,11 +392,10 @@ instance:
 so|ve(h)le|ne(h)ni|ra(h)da|ção(h)de|(h)
 \end{verbatim}
 
-Here the second line reads \textit{veneração}: even though \texttt{ção} has
-no trailing space, it still ends the word, because the last syllable's
-second line is left empty --- so no automatic hyphen is generated after
-\texttt{ção}.  Automatic hyphens follow these per-line word boundaries,
-including at line breaks.
+Here the second line reads \textit{veneração}: the word ends at
+\texttt{ção}, because the last syllable's second line is left empty, so no
+automatic hyphen is generated after it.  Automatic hyphens follow these
+per-line word boundaries, including at line breaks.
 
 Because the pipe starts a new lyric line, a literal \texttt{|} in syllable
 text must be escaped as \texttt{\$|}.
