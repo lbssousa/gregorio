@@ -50,6 +50,7 @@ local skip_type_clearsyllable = 5
 --- Possible values of syllables[sid].dash
 local dash_maybedash = 1
 local dash_hasdash = 2
+local dash_endofword = 3
 local dash_forced = 5
 
 -- Functions for manipulating glue, which we just store as a 3-tuple
@@ -172,6 +173,21 @@ local function current_syllable()
   local sid = tex.getattribute(syllable_id_attr)
   if syllables[sid] == nil then syllables[sid] = {} end
   return syllables[sid]
+end
+
+--- Record hyphenation information about one additional lyric line (level 2+)
+--- of the current syllable, called from \GreWriteLyricLine.
+--- @param level number The lyric line level (2 for the first additional line).
+--- @param end_of_word number 1 if this level ends a word here, else 0.
+local function set_lyric_line_dash(level, end_of_word)
+  local cur = current_syllable()
+  if cur.levels == nil then cur.levels = {} end
+  if cur.levels[level] == nil then cur.levels[level] = {} end
+  if end_of_word == 1 then
+    cur.levels[level].dash = dash_endofword
+  else
+    cur.levels[level].dash = dash_maybedash
+  end
 end
 
 --- Save information about syllables that is impossible or
@@ -517,6 +533,7 @@ local function syllable_rewriting()
 end
 
 gregoriotex.save_syllable_info = save_syllable_info
+gregoriotex.set_lyric_line_dash = set_lyric_line_dash
 gregoriotex.save_syllable_texts = save_syllable_texts
 gregoriotex.save_min_distances = save_min_distances
 gregoriotex.current_syllable = current_syllable
