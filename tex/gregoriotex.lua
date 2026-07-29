@@ -918,7 +918,17 @@ local function adjust_additional_spaces(line, info, linenum, prev_stack_extra)
   local lyrics_lower = blnabc_lower + extra_space_lines_text + additional_bottom_space
   -- the translation goes below the whole stack of lyric lines
   local translation_lower = lyrics_lower + lyric_stack_extra + translation_height
-  local everything_raise = translation_lower + extra_space_beneath_text
+  -- everything_raise re-centers the line's reference point around how far
+  -- lyrics/translation were pushed down, so the staff sits at a consistent
+  -- height across lines regardless of that push. lyric_stack_extra must stay
+  -- out of it: the deepest stacked lyric line is already independently
+  -- positioned by its own \raise in \GreWriteLyricLine, so folding the same
+  -- amount in here a second time shifts the *whole* line (staff included)
+  -- up by that much, inflating its reported height instead of its depth.
+  -- That inflated height then starves the interline glue *above* this line
+  -- (not below it, where the extra room actually belongs), which can push
+  -- that glue below \lineskiplimit and collapse it to \lineskip.
+  local everything_raise = lyrics_lower + translation_height + extra_space_beneath_text
 
   -- When the staff is collapsed, adjust the annotation position so it sits
   -- at the correct distance from the lyrics/initial.
