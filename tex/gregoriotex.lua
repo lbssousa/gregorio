@@ -606,8 +606,24 @@ local function find_attr(cur, attr, val)
   end
 end
 
--- Recompute interline glue
-local function adjust_glue(g)
+-- Recompute interline glue.
+--
+-- forgive_depth: the portion of the previous line's depth, if any, that
+-- comes from that line's own stacked lyrics (see the lyric_stack_extra
+-- computed in adjust_additional_spaces, passed through by its caller as
+-- this line's prev_stack_extra). A stacked lyric line genuinely needs
+-- that much extra room below the previous system, but it must not be
+-- allowed to eat into the *unrelated* headroom baselineskip normally
+-- leaves for other tall content (e.g. a custos or a high episema) on
+-- that same previous line: doing so can tip new_width negative and make
+-- TeX fall back to the much smaller \lineskip, collapsing the gap
+-- instead of just reserving the extra depth the stack actually needs.
+-- Excluding forgive_depth from the check (and adding it back into the
+-- width) reserves exactly that much extra space for this one transition
+-- without perturbing \baselineskip, and thus without affecting any other
+-- transition in the score.
+local function adjust_glue(g, forgive_depth)
+  forgive_depth = forgive_depth or 0
   -- Find previous line and its depth
   local prevline = g.prev
   while prevline ~= nil and prevline.id ~= hlist do
@@ -619,14 +635,14 @@ local function adjust_glue(g)
   else
     prevdepth = prevline.depth
   end
-    
-  debugmessage('adjust_glue', 'prev depth %.2f, cur height %.2f', prevdepth/2^16, g.next.height/2^16)
+
+  debugmessage('adjust_glue', 'prev depth %.2f, cur height %.2f, forgive_depth %.2f', prevdepth/2^16, g.next.height/2^16, forgive_depth/2^16)
   debugmessage('adjust_glue', 'baselineskip width=%.2f', tex.baselineskip.width/2^16)
 
   local subtype = 'baselineskip'
   debugmessage('adjust_glue', 'old glue is %s %spt plus %spt minus %spt', subtype, g.width/2^16, g.stretch/2^16, g.shrink/2^16)
-  
-  local new_width = tex.baselineskip.width - prevdepth - g.next.height
+
+  local new_width = tex.baselineskip.width - (prevdepth - forgive_depth) - g.next.height
   if new_width < tex.lineskiplimit then
     g.subtype = subtype_lineskip
     node.setglue(g, node.getglue(tex.lineskip))
@@ -635,7 +651,7 @@ local function adjust_glue(g)
     node.setglue(g, node.getglue(tex.baselineskip))
     g.width = new_width
   end
-  
+
   debugmessage('adjust_glue', 'new glue is %s %spt plus %spt minus %spt', node.subtypes(glue)[g.id], g.width/2^16, g.stretch/2^16, g.shrink/2^16)
 end
 
@@ -776,10 +792,16 @@ local function get_if(name)
   return token.create('if'..name).mode == iftrue_token.mode
 end
 
-local function adjust_additional_spaces(line, info, linenum)
+local function adjust_additional_spaces(line, info, linenum, prev_stack_extra)
   -- Adjust the vertical positioning of all the parts of line, as well
   -- as its total height and the interline skip above the line.
-  
+  -- prev_stack_extra is the lyric_stack_extra (see below) computed for
+  -- the *previous* line by the caller's previous iteration; it is
+  -- forwarded to adjust_glue so the glue above this line can reserve
+  -- exactly the extra depth the previous line's own stacked lyrics need,
+  -- regardless of the current line's content. Returns this line's own
+  -- lyric_stack_extra so the caller can pass it along for the next line.
+
   local function get_per_line_space(name)
     if per_line_dims[linenum] ~= nil and per_line_dims[linenum][name] ~= nil then
       return per_line_dims[linenum][name]
@@ -1006,8 +1028,10 @@ local function adjust_additional_spaces(line, info, linenum)
   _, line.height, line.depth = node.rangedimensions(line, line.head)
 
   if line.prev ~= nil and line.prev.id == glue then
-    adjust_glue(line.prev)
+    adjust_glue(line.prev, prev_stack_extra)
   end
+
+  return lyric_stack_extra
 end
 
 --- Callback for processing before ligaturing or kerning takes place.
@@ -1115,14 +1139,16 @@ local function post_linebreak(h, groupcode, glyphes)
       info = compute_line_statistics(line, info, linenum)
       linenum = linenum + 1
     end
+    local prev_stack_extra = 0
     for line in traverse_id(hlist, h) do
-      adjust_additional_spaces(line, info)
+      prev_stack_extra = adjust_additional_spaces(line, info, nil, prev_stack_extra)
     end
   elseif tex.count['gre@variableheightexpansion'] == 1 then -- variable
     local linenum = 1
+    local prev_stack_extra = 0
     for line in traverse_id(hlist, h) do
       local info = compute_line_statistics(line)
-      adjust_additional_spaces(line, info, linenum)
+      prev_stack_extra = adjust_additional_spaces(line, info, linenum, prev_stack_extra)
       linenum = linenum + 1
     end
   end

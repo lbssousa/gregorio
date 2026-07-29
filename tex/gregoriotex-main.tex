@@ -1095,21 +1095,15 @@
 \def\GreScoreLyricLines#1{%
   \global\gre@count@lyriclines=#1\relax%
   % Stacked lyric lines (level 2+) extend below the main baseline by
-  % lyricstackseparation per extra level (see \GreWriteLyricLine). Systems
-  % without that extra content report a shallower box, so a fixed
-  % \baselineskip leaves no headroom for it: whenever a nearby system's own
-  % height/depth (e.g. from a custos or a tall note) additionally eats into
-  % that margin, the interline glue can go negative and TeX silently
-  % substitutes \lineskip (a few points) for \baselineskip (tens of points),
-  % collapsing the gap between systems instead of spacing them uniformly.
-  % Widening the score's \baselineskip by the extra depth stacking can use
-  % keeps that margin positive throughout the score, so this fallback is not
-  % needed on its account.
-  \ifnum#1>1\relax%
-    \gre@dimen@temp@one=\gre@space@dimen@lyricstackseparation\relax%
-    \multiply\gre@dimen@temp@one by \numexpr#1-1\relax%
-    \advance\baselineskip by \gre@dimen@temp@one\relax%
-  \fi%
+  % lyricstackseparation per extra level (see \GreWriteLyricLine). That
+  % extra depth needs corresponding extra headroom in the interline glue
+  % above the *next* system, or TeX's own baselineskip/lineskiplimit
+  % logic can silently substitute \lineskip (a few points) for
+  % \baselineskip (tens of points), collapsing that one gap. This is
+  % handled per system transition in Lua (see adjust_glue and its
+  % prev_stack_extra/forgive_depth parameters in gregoriotex.lua), which
+  % reserves the extra room only where a system actually used stacking,
+  % rather than widening \baselineskip for the whole score.
 }%
 
 \newdimen\gre@dimen@lyriclinecenter%
