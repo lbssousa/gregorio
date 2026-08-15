@@ -15,6 +15,9 @@ A `-` right before the `|` that closes a stacked lyric line now forces a hyphen 
 ### A textless syllable is no longer always exempt from automatic hyphenation
 
 A syllable with no lyric text (e.g. the `(g)` and `(h)` in `foo(f)(g)(h)bar(i)`) used to always be treated as ending a word, regardless of whether the gabc had a space around it, which made it ineligible for automatic hyphenation. It's now treated the same as a syllable with text: eligibility comes from its actual gabc word-position (whether there's a space before the next syllable), so a textless syllable written with no surrounding space, as in the example above, may now get an automatic hyphen (and the tighter, same-word spacing that comes with it) where it previously never could. To recover the old behavior, add an explicit space before the following syllable, e.g. `foo(f)(g)(h) bar(i)`.
+### Vertical spacing near rare signs and below-lines nabc
+
+Rare signs (accentus, circulus, semicirculus, musica ficta) now reserve a bit more vertical space above the note, to avoid overlapping above-lines text. Below-lines nabc neumes next to low notes now reserve a bit more space too, so they no longer overlap the note itself. If you'd rather keep the old below-lines nabc behavior, give `additionalbottomspacenabcthreshold` a low value, e.g. `\grechangecount{additionalbottomspacenabcthreshold}{-2}` (same convention as `noteadditionalspacelinestextthreshold`: lower means less reactive, not higher).
 
 ## 6.2
 
