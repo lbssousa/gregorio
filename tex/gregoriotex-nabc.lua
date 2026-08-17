@@ -105,6 +105,23 @@ end
 
 local gregalltab = {}
 local gregallmetrics = {}
+-- Size (in sp) at which each font's metrics were read; see nabc_font_scale.
+local gregallfontsize = {}
+
+-- Factor by which the cached metrics of a NABC font must be multiplied to
+-- match the font currently selected.  This makes it possible to use the same
+-- NABC font at several sizes in one document.
+local function nabc_font_scale(fontname)
+  local reference = gregallfontsize[fontname]
+  if not reference or reference == 0 then
+    return 1
+  end
+  local current = font.getfont(font.current())
+  if not current or not current.size or current.size == 0 then
+    return 1
+  end
+  return current.size / reference
+end
 
 -- NABC alignment mode (per-voice, with global default):
 -- 'full' = align to left of entire complex glyph descriptor (default)
@@ -303,6 +320,13 @@ local add_spacing = function(str, len, idx, ret)
 end
 
 local gregallparse_neumes = function(str, kind, scale, voice)
+  -- The metrics of a NABC font are read once, at the size the font had when
+  -- it was first loaded (see init_font), so using the same font at another
+  -- size needs every metric-derived raise and kern to be scaled.  A scale of
+  -- 0 (or nil) means "work it out from the font currently selected".
+  if not scale or scale == 0 then
+    scale = nabc_font_scale(kind)
+  end
   local len = str:len()
   local idx = 1
   local ret = ''
@@ -478,6 +502,8 @@ end
 local function init_font(fontname)
   if not gregalltab[fontname] then
     gregalltab[fontname], gregallmetrics[fontname] = gregallreadfont(fontname, font.current())
+    local fontdata = font.getfont(font.current())
+    gregallfontsize[fontname] = fontdata and fontdata.size or 0
   end
 end
 

@@ -10,8 +10,12 @@ As of v3.0.0 this project adheres to [Semantic Versioning](http://semver.org/). 
 - Fixed a bug in horizontal spacing when the first syllable consists of only a bar. See [PR #1741](https://github.com/gregorio-project/gregorio/pull/1741).
 - Fixed a bug in horizontal spacing before a soft alteration. See [PR #1761](https://github.com/gregorio-project/gregorio/pull/1761).
 - Worked around a LuaTeX bug (file descriptor inheritance in `os.spawn()`) that could corrupt LuaTeX's input state when `\gregorioscore` or `\gabcsnippet` was used inside an `\input`-ted file on a clean build. See [#1757](https://github.com/gregorio-project/gregorio/issues/1757).
+- `\gabcsnippet` passed the `--deprecation-errors` option to `gregorio` when deprecated constructs were *allowed* instead of when they were forbidden, i.e. exactly the other way round from `\gregorioscore`.
+- The metrics of a nabc font were cached at the size at which the font was first loaded, so using the same nabc font at two different sizes in one document gave wrong raises and kerns for the second one. They are now scaled to the size of the font actually in use.
 
 ### Added
+- Added inline gabc+nabc snippets, i.e. small scores set inside a paragraph of running text rather than as a display: `\gabcinlinesnippet` for a fragment of score (staff lines trimmed to the width of the music), `\gabcneumesnippet` for a bare neume with no staff and no clef, optionally accompanied by nabc glyphs above and below, and `\nabcsnippet` for nabc glyphs on their own. `\grenabcfont` selects the nabc font and size for the current TeX group only, and `\gresetinlinesnippetraise` and `\gresetinlinesnippethook` tune how snippets are typeset.
+- Snippets compiled with `\gabcsnippet` and friends are now cached, in memory and in the output directory, so that a document using many of them no longer runs `gregorio` once per snippet per run.
 - Code for several features related to horizontal spacing (spacing between non-bar syllables, syllable rewriting, clearing, and hyphenation) was moved into Lua. This results in some changes in horizontal spacing, which, if perceptible, should be improvements. See [#1720](https://github.com/gregorio-project/gregorio/issues/1720).
 
 ### Changed
