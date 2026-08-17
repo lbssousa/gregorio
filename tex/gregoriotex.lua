@@ -1639,16 +1639,64 @@ local function include_score(gabc_file, force_gabccompile, allow_deprecated)
   tex.print(string.format([[\input %s\relax]], gtex_file))
 end
 
+-- Compiled snippets, keyed by a digest of the gabc source.  Snippets are
+-- typically small and repeated (inline snippets in running text), and each
+-- compilation spawns a gregorio process, so the result is memoized for the
+-- run and, when the compilation was clean, kept in the output directory for
+-- subsequent runs.
+local snippet_cache = {}
+
+-- Name of the on-disk cache file for a snippet, or nil if the output
+-- directory is not usable.
+local function snippet_cache_file(key)
+  local dir = base_output_dir..'/'
+  if not lfs.exists(dir) then
+    local ok, message = lfs.mkdirp(dir)
+    if not ok then
+      info('Could not create directory %s: %s', dir, message)
+      return nil
+    end
+  end
+  return string.format("%ssnippet-%s-%s.gtex", dir, key,
+                       internalversion:gsub("%.", "_"))
+end
+
 local function direct_gabc(gabc, header, allow_deprecated)
+  -- trims spaces on both ends (trim6 from http://lua-users.org/wiki/StringTrim)
+  gabc = gabc:match('^()%s*$') and '' or gabc:match('^%s*(.*%S)')
+  local source = 'name:direct-gabc;\n'..(header or '')..'\n%%\n'..gabc:gsub('\\par', '\n')
+  local key = md5.sumhexa(source..'\0'..(allow_deprecated and '1' or '0'))
+
+  local cached = snippet_cache[key]
+  if cached then
+    debugmessage('snippet', 'reusing snippet %s from memory', key)
+    tex.print(cached)
+    return
+  end
+
+  local cache_file = snippet_cache_file(key)
+  if cache_file and lfs.exists(cache_file) then
+    local cache = io.open(cache_file, 'r')
+    if cache then
+      local content = cache:read('*a')
+      cache:close()
+      if content and content ~= '' then
+        debugmessage('snippet', 'reusing snippet %s from %s', key, cache_file)
+        kpse.record_input_file(cache_file)
+        snippet_cache[key] = content:explode('\n')
+        tex.print(snippet_cache[key])
+        return
+      end
+    end
+  end
+
   info('Processing gabc snippet...')
   kpse.record_output_file(snippet_filename)
   local f = io.open(snippet_filename, 'w')
-  -- trims spaces on both ends (trim6 from http://lua-users.org/wiki/StringTrim)
-  gabc = gabc:match('^()%s*$') and '' or gabc:match('^%s*(.*%S)')
-  f:write('name:direct-gabc;\n'..(header or '')..'\n%%\n'..gabc:gsub('\\par', '\n'))
+  f:write(source)
   f:close()
   cmd = {gregorio_exe(), '-W'}
-  if allow_deprecated then table.insert(cmd, '-D') end
+  if not allow_deprecated then table.insert(cmd, '-D') end
   table.extend(cmd, {'-o', tmpname, '-l', snippet_logname, snippet_filename})
   info('Running %s', table.concat(cmd, ' '))
   local content = get_prog_output(cmd, tmpname, '*a')
@@ -1659,14 +1707,18 @@ local function direct_gabc(gabc, header, allow_deprecated)
         .."See the documentation of Gregorio or your TeX\n"
         .."distribution to automatize it.", cmd, tex.formatname, tex.jobname)
   else
-    tex.print(content:explode('\n'))
+    snippet_cache[key] = content:explode('\n')
+    tex.print(snippet_cache[key])
   end
+  local clean = true
   local glog = io.open(snippet_logname, 'a+')
   if glog == nil then
     err("\n Unable to open %s", snippet_logname)
+    clean = false
   else
     local size = glog:seek('end')
     if size > 0 then
+      clean = false
       glog:seek('set')
       local line
       for line in glog:lines() do
@@ -1676,10 +1728,132 @@ local function direct_gabc(gabc, header, allow_deprecated)
     end
     glog:close()
   end
+  -- Only cache clean compilations on disk: a snippet which produced warnings
+  -- must be recompiled on every run so that its warnings keep being reported.
+  if content ~= nil and clean and cache_file then
+    delete_versioned_files(base_output_dir..'/', 'snippet%-'..key, 'gtex')
+    local cache = io.open(cache_file, 'w')
+    if cache then
+      cache:write(content)
+      cache:close()
+      kpse.record_output_file(cache_file)
+    end
+  end
   if not (debug_types_activated['snippet'] or debug_types_activated['all']) then
     os.remove(snippet_filename)
     os.remove(snippet_logname)
   end
+end
+
+-- Attributes which only make sense while a score is being typeset.  They are
+-- stripped from a finished inline snippet so that its box is inert should it
+-- end up nested inside another score's paragraph, where post_linebreak is
+-- active and would otherwise stretch the snippet's staff lines to the width
+-- of the enclosing score line.
+local function strip_score_attributes(head)
+  for n in traverse(head) do
+    node.unset_attribute(n, part_attr)
+    node.unset_attribute(n, center_attr)
+    if n.id == hlist or n.id == vlist then
+      strip_score_attributes(n.head)
+    end
+  end
+end
+
+-- Set the width of the staff lines (and of the commentary) to the width of
+-- the finished snippet.  adjust_fullwidth has normally done this already, but
+-- not for a snippet which broke into several lines: there, the first line is
+-- not the last one, so its staff was stretched to the (huge) snippet \hsize.
+local function set_fullwidth_parts(head, width)
+  for n in traverse(head) do
+    if n.id == hlist or n.id == vlist then
+      local attr = has_attribute(n, part_attr)
+      if attr == part_commentary or attr == part_stafflines then
+        n.width = width
+      else
+        set_fullwidth_parts(n.head, width)
+      end
+    end
+  end
+end
+
+-- Whether a node list contains anything that leaves a mark on the page.  The
+-- empty lyric box of a lyric-less snippet and the staff box of a snippet whose
+-- staff lines are invisible are both boxes reaching down to the baseline while
+-- printing nothing, and they must not be taken for the bottom of the snippet.
+local function has_ink(head)
+  for n in traverse(head) do
+    if n.id == glyph or n.id == rule then
+      return true
+    elseif (n.id == hlist or n.id == vlist) and has_ink(n.head) then
+      return true
+    end
+  end
+  return false
+end
+
+--- Pull the contents of a snippet box down onto its baseline.
+-- A score line reserves room for its lyrics under the notes, and, when
+-- below-lines NABC is present, adjust_additional_spaces raises everything by
+-- a further belowlinesnabcheight so that the lyrics stay put.  A bare neume
+-- has no lyrics, so all that room is empty space between the lowest glyph and
+-- the baseline, which would spoil the leading of the paragraph the snippet is
+-- set in.  Shifting every top-level box down by that amount makes the box sit
+-- tightly on the baseline.
+local function drop_to_baseline(hbox)
+  local top, bottom = nil, nil
+  for n in traverse(hbox.head) do
+    if (n.id == hlist or n.id == vlist) and has_ink(n.head) then
+      -- shift is positive downwards
+      if top == nil or n.shift - n.height < top then top = n.shift - n.height end
+      if bottom == nil or n.shift + n.depth > bottom then bottom = n.shift + n.depth end
+    end
+  end
+  -- Nothing to do unless the whole snippet floats above the baseline.
+  if bottom == nil or bottom >= 0 then return end
+  debugmessage('snippet', 'dropping snippet contents by %spt', -bottom/2^16)
+  for n in traverse(hbox.head) do
+    if n.id == hlist or n.id == vlist then
+      n.shift = n.shift - bottom
+    end
+  end
+  hbox.height = bottom - top
+  hbox.depth = 0
+end
+
+--- Turn the vbox built by an inline snippet into a single hbox of natural width.
+-- The snippet is typeset as an ordinary score paragraph inside a vbox with a
+-- very large \hsize, so that it never breaks and \parfillskip absorbs all the
+-- slack; adjust_fullwidth has then trimmed the staff lines to the natural
+-- width of the score.  All that is left is to extract the single line and
+-- repack it at its natural width so that it can be used in horizontal mode.
+-- @param boxnum the box register holding the vbox; it receives the hbox
+local function finish_inline_snippet(boxnum)
+  local vbox = tex.getbox(boxnum)
+  if vbox == nil then
+    err("An inline gabc snippet produced no material")
+    return
+  end
+  local line, extra = nil, 0
+  for n in traverse_id(hlist, vbox.head) do
+    if line == nil then line = n else extra = extra + 1 end
+  end
+  if line == nil then
+    warn("An inline gabc snippet produced no score line")
+    tex.setbox(boxnum, node.new(hlist))
+    return
+  end
+  if extra > 0 then
+    warn("An inline gabc snippet spans %d lines; keeping the first one only.\n"
+        .."Remove the 'z' or 'Z' line breaks from the snippet.", extra + 1)
+  end
+  local head = line.head
+  line.head = nil
+  local hbox = hpack(head)
+  set_fullwidth_parts(hbox, hbox.width)
+  strip_score_attributes(hbox)
+  drop_to_baseline(hbox)
+  tex.setbox(boxnum, hbox)
 end
 
 local function get_gregoriotexluaversion()
@@ -2148,6 +2322,7 @@ gregoriotex.set_font_factor              = set_font_factor
 gregoriotex.def_symbol                   = def_symbol
 gregoriotex.font_size                    = font_size
 gregoriotex.direct_gabc                  = direct_gabc
+gregoriotex.finish_inline_snippet        = finish_inline_snippet
 gregoriotex.var_brace_len                = var_brace_len
 gregoriotex.save_length                  = save_length
 gregoriotex.width_to_bp                  = width_to_bp

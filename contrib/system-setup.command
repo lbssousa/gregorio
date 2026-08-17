@@ -124,6 +124,7 @@ gregoriotex-chars.tex
 gregoriotex-main.tex
 gregoriotex-nabc.lua
 gregoriotex-nabc.tex
+gregoriotex-snippet.tex
 gregoriotex-signs.lua
 gregoriotex-signs.tex
 gregoriotex-spaces.tex

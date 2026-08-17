@@ -198,7 +198,7 @@
 
 \gresetspecial{\string\126\string\126}{\textasciitilde{}}%
 
-\long\def\nabcsnippet#1#2{%
+\long\def\nabcdisplay#1#2{%
   \directlua{gregoriotex.direct_gabc("\luaescapestring{\unexpanded\expandafter{#2}}",
                                      "nabc-lines:#1;", false)}%
 }%
