@@ -342,7 +342,10 @@ semicolon. */
 <score>\} {
         return CENTER_END;
     }
-<score><alt> {
+<score><alt(:[lcr])?> {
+        gabc_score_determination_lval.character =
+                (gabc_score_determination_leng == 5) ? '\0'
+                : gabc_score_determination_text[5];
         BEGIN(alt);
         return ALT_BEGIN;
     }
