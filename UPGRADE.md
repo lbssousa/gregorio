@@ -8,6 +8,14 @@ This file contains instructions to upgrade to a new release of Gregorio.  These 
 
 Rare signs (accentus, circulus, semicirculus, musica ficta) now reserve a bit more vertical space above the note, to avoid overlapping above-lines text. Below-lines nabc neumes next to low notes now reserve a bit more space too, so they no longer overlap the note itself. If you'd rather keep the old below-lines nabc behavior, give `additionalbottomspacenabcthreshold` a low value, e.g. `\grechangecount{additionalbottomspacenabcthreshold}{-2}` (same convention as `noteadditionalspacelinestextthreshold`: lower means less reactive, not higher).
 
+### `\gabcsnippet` now honors `allowdeprecated`
+
+Since 6.1, `\gabcsnippet` passed `gregorio`'s `--deprecation-errors` option exactly the other way round from `\gregorioscore`: deprecated constructs were treated as errors when they were *allowed*, and merely warned about when they were forbidden.  This has been corrected, so `\gabcsnippet` and `\gregorioscore` now behave alike.
+
+If you load GregorioTeX with `allowdeprecated=false`, a `\gabcsnippet` containing a deprecated construct now raises an error where it previously only produced a warning.  This is the behavior the option asks for, but it may stop a document that used to compile; either update the gabc in the snippet, or drop the `allowdeprecated=false` option.
+
+With the default `allowdeprecated=true` there is nothing to do: snippets that previously failed to compile now succeed.
+
 ## 6.2
 
 ### LuaTeX >= 1.0 required
