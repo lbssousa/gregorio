@@ -860,6 +860,7 @@ local score_state = {
       'gre@space@count@additionaltopspacethreshold',
       'gre@space@count@additionaltopspacealtthreshold',
       'gre@space@count@additionaltopspacenabcthreshold',
+      'gre@space@count@additionalbottomspacenabcthreshold',
       'gre@space@count@noteadditionalspacelinestextthreshold',
       'gre@count@stafflines', 'gre@factor',
     },
