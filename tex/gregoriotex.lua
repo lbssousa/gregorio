@@ -853,14 +853,16 @@ local score_state = {
   names = {
     space = {
       'abovelinesnabcheight', 'abovelinesnabcraise', 'abovelinestextheight',
-      'abovelinestextraise', 'belowlinesnabcheight', 'noteadditionalspacelinestext',
-      'spaceabovelines', 'spacebeneathtext', 'spacelinestext', 'translationheight',
+      'abovelinestextraise', 'belowlinesnabcheight', 'lyricstackseparation',
+      'noteadditionalspacelinestext', 'spaceabovelines', 'spacebeneathtext',
+      'spacelinestext', 'translationheight',
     },
     count = {
       'gre@space@count@additionaltopspacethreshold',
       'gre@space@count@additionaltopspacealtthreshold',
       'gre@space@count@additionaltopspacenabcthreshold',
       'gre@space@count@noteadditionalspacelinestextthreshold',
+      'gre@space@count@additionalbottomspacenabcthreshold',
       'gre@count@stafflines', 'gre@factor',
     },
     dimen = {
