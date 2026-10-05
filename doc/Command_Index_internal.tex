@@ -316,6 +316,50 @@ argument.
   \#2 & string & Relative or absolute path to the score.\\
 \end{argtable}
 
+\macroname{\textbackslash gre@snippet@build}{\#1\#2\#3}{gregoriotex-snippet.tex}
+The common engine of the inline snippet macros.  It typesets the snippet's
+score in an \verb=\hbox=, i.e.\ in restricted horizontal mode: the score is
+then not a paragraph and never reaches the line breaker, so the box comes out
+at the natural width of the music, which is what an inline snippet wants, and
+a forced line break (\texttt{z} or \texttt{Z}) in the gabc has no effect.
+Because neither of the line-break callbacks runs on such a score,
+\verb=gregoriotex.finish_snippet= applies to the box what a score line gets
+from them: the syllable spacing, the vertical adjustment of nabc, lyrics and
+translations, and the setting of the staff lines to the width of the music.
+That can only happen once the box is closed, by which point \TeX\ has restored
+the settings the score made inside it, so the last thing inside the box is a
+call to \verb=gregoriotex.capture_score_state=, which takes a copy of the
+state the vertical adjustment depends on while the score is still open.
+
+\begin{argtable}
+  \#1 & string & Extra gabc headers, or empty.\\
+  \#2 & code & Additional settings applied inside the snippet group.\\
+  \#3 & string & The gabc body of the snippet.\\
+\end{argtable}
+
+\macroname{\textbackslash gre@snippet@hook}{}{gregoriotex-snippet.tex}
+The user hook set by \verb=\gresetinlinesnippethook=, run inside the snippet
+group just before the score itself.
+
+\macroname{\textbackslash gre@snippet@savestate}{}{gregoriotex-snippet.tex}
+Records the settings which a snippet may change globally (the staff size, and
+whether the staff dimensions are zeroed), so that
+\verb=\gre@snippet@restorestate= can put them back.  A \TeX\ group is not
+enough, since those settings are set with \verb=\global=, and the user's
+\verb=\gresetinlinesnippethook= may change either.
+
+\macroname{\textbackslash gre@snippet@restorestate}{}{gregoriotex-snippet.tex}
+Restores what \verb=\gre@snippet@savestate= recorded and recomputes the
+derived distances.
+
+\macroname{\textbackslash gre@snippet@restorezero}{}{gregoriotex-snippet.tex}
+Set by \verb=\gre@snippet@savestate= to \verb=\gre@staffdimensions@dozero= or
+\verb=\gre@staffdimensions@unzero=, whichever puts back the staff dimension
+zeroing in force before the snippet.
+
+\macroname{\textbackslash gre@inlinesnippet@option}{[\#1]\#2}{gregoriotex-snippet.tex}
+Internal to \verb=\gabcinlinesnippet=.
+
 \macroname{\textbackslash gre@writemode}{\#1\#2\#3}{gregoriotex-main.tex}
 Macro that writes its arguments with \verb=\greannotation=.  This
 macro is typically called by \verb=\GreMode= in the gtex file.
@@ -2243,6 +2287,11 @@ Box for saving NABC voice 1 (above staff) content between phase 1 (prepare) and 
 \macroname{\textbackslash gre@box@nabc@voice@ii}{}{gregoriotex-nabc.tex}
 Box for saving NABC voice 2 (below staff) content between phase 1 (prepare) and phase 2 (place) of the two-phase processing. The two-phase approach ensures all note-level kerns are emitted before any voice hbox is placed, guaranteeing correct horizontal alignment.
 
+\macroname{\textbackslash gre@box@snippet}{}{gregoriotex-snippet.tex}
+Box in which an inline snippet is built.  It first holds the score as \TeX\
+packed it, and is then replaced by the finished snippet, repacked at its
+natural width by \verb=gregoriotex.finish_snippet=.
+
 
 \subsection{Protrusion factors}
 
@@ -2399,6 +2448,10 @@ Dimension for communicating NABC left overflow from Lua to \TeX. When NABC align
 
 \macroname{\textbackslash gre@dimen@nabckernemitted}{}{gregoriotex-nabc.tex}
 Tracks the total kern emitted at the note level across all NABC voices for the current syllable. Used to coordinate left overflow handling between voice 1 (above staff) and voice 2 (below staff), ensuring that only the maximum overflow is applied. Reset to 0pt after each syllable.
+
+\macroname{\textbackslash gre@dimen@snippetraise}{}{gregoriotex-snippet.tex}
+The vertical offset applied to inline snippets, set by
+\verb=\gresetinlinesnippetraise=.
 
 \macroname{\textbackslash greslurheight}{}{gregoriotex-signs.tex}
 Stores the computed height of a variable-length slur.  The control sequence name

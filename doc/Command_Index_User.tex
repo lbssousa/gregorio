@@ -207,6 +207,67 @@ includes it directly in the document.
   \gabcsnippet{(c3) Al(eg~)le(gv.fhg)lu(efe___)ia(e.) (::)}
 \end{latexcode}
 
+Like a score included with \verb|\gregorioscore|, a \verb|\gabcsnippet| is a
+paragraph of its own.  Use \verb|\gabcinlinesnippet| (below) for a
+snippet which is to appear inside a paragraph of running text.
+
+
+\subsubsection{Inline snippets}
+\label{sec:inline-snippets}
+
+The macros in this section typeset a small score \emph{inside} a paragraph
+instead of starting a new one.  A snippet is always a single line; the
+staff lines, if any, are trimmed to the width actually taken up by the score,
+and the box is trimmed to the material it contains, so that the snippet
+disturbs the leading of the surrounding paragraph as little as possible.  The
+baseline of the snippet is the baseline of its lyrics, which therefore line up
+with the surrounding text.
+
+\macroname{\textbackslash gabcinlinesnippet}{[\optional{\#1}]\{\#2\}}{gregoriotex-snippet.tex}
+Converts the gabc notation specified in \texttt{\#2} to Gregorio\TeX\ and
+includes it inside the current paragraph.
+
+\begin{argtable}
+  \#1 & string & Optional. Extra gabc headers, written as they would be in a
+  gabc file (\texttt{name:value;}), for instance \texttt{nabc-lines:1;} or
+  \texttt{staff-lines:5;}.\\
+  \#2 & string & The gabc to insert into the document.\\
+\end{argtable}
+
+\medskip For example:\par\medskip
+\begin{latexcode}
+  The \gabcinlinesnippet{(c3) Al(eg~)le(gv.fhg)lu(efe___)ia(e.) (::)} of
+  the Mass of the day.
+\end{latexcode}
+
+A snippet is typeset in restricted horizontal mode, where there are no lines
+to break, so a forced line break (\texttt{z} or \texttt{Z}) in the gabc has no
+effect: the snippet simply runs on as a single staff.
+
+\macroname{\textbackslash gresetinlinesnippetraise}{\{\#1\}}{gregoriotex-snippet.tex}
+Sets the vertical offset applied to inline snippets.  The default is
+\texttt{0pt}, which puts the snippet on the baseline of the surrounding text.
+
+\begin{argtable}
+  \#1 & distance & The offset; positive values raise the snippet.\\
+\end{argtable}
+
+\macroname{\textbackslash gresetinlinesnippethook}{\{\#1\}}{gregoriotex-snippet.tex}
+Sets code to be run inside the group in which inline snippets are typeset,
+just before the score itself.  This is the place for settings which are to
+apply to snippets only, such as \verb|\grechangestaffsize| or
+\verb|\grechangedim|.
+
+\begin{argtable}
+  \#1 & code & The code to run. It replaces any previously set hook; an empty
+  argument removes the hook.\\
+\end{argtable}
+
+\medskip For example:\par\medskip
+\begin{latexcode}
+  \gresetinlinesnippethook{\grechangestaffsize{12}}
+\end{latexcode}
+
 
 \subsubsection{Point-and-click}
 
