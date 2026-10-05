@@ -556,8 +556,28 @@ end
 
 gregoriotex.module.debugmessage = debugmessage
 
--- Find stafflines and commentary, which are meant to take up the full
--- line width, and adjust them to actually take up the full line
+-- Find stafflines and commentary, which are meant to take up the full line
+-- width, and set them to the given width.
+local function set_part_widths(cur, width)
+  for child in node.traverse_list(cur.head) do
+    local attr = has_attribute(child, part_attr)
+    if attr == part_commentary or attr == part_stafflines then
+      debugmessage("adjust_fullwidth", "width %spt -> %spt", child.width/2^16, width/2^16)
+      if child.id == hlist then
+        local repacked = node.hpack(child.head, width, 'exactly')
+        repacked.shift = child.shift
+        cur.head = node.insert_before(cur.head, child, repacked)
+        cur.head = node.remove(cur.head, child)
+      else
+        child.width = width
+      end
+    else
+      set_part_widths(child, width)
+    end
+  end
+end
+
+-- Adjust the full-width parts of a line to actually take up the full line
 -- width.
 local function adjust_fullwidth (line)
   -- Determine line width, ignoring \leftskip and \rightskip
@@ -574,26 +594,7 @@ local function adjust_fullwidth (line)
   end
   debugmessage("adjust_fullwidth", "line width %spt", line_width/2^16)
 
-  local function visit(cur)
-    for child in node.traverse_list(cur.head) do
-      local attr = has_attribute(child, part_attr)
-      if attr == part_commentary or attr == part_stafflines then
-        debugmessage("adjust_fullwidth", "width %spt -> %spt", child.width/2^16, line_width/2^16)
-        if child.id == hlist then
-          local new = node.hpack(child.head, line_width, 'exactly')
-          new.shift = child.shift
-          cur.head = node.insert_before(cur.head, child, new)
-          cur.head = node.remove(cur.head, child)
-        else
-          child.width = line_width
-        end
-      else
-        visit(child)
-      end
-    end
-  end
-
-  visit(line)
+  set_part_widths(line, line_width)
 end
 
 local function find_attr(cur, attr, val)
