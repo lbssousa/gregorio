@@ -13,6 +13,7 @@ As of v3.0.0 this project adheres to [Semantic Versioning](http://semver.org/). 
 - Worked around a LuaTeX bug (file descriptor inheritance in `os.spawn()`) that could corrupt LuaTeX's input state when `\gregorioscore` or `\gabcsnippet` was used inside an `\input`-ted file on a clean build. See [#1757](https://github.com/gregorio-project/gregorio/issues/1757).
 
 ### Added
+- Added `\boxedgregorioscore`, which typesets a score as its own paragraph, exactly like `\gregorioscore`, but confined to a given width: `\linewidth` by default, which is correct both in a table cell and in a list item, or an explicit width set with `\gresetboxedscorewidth` (`\gresetboxedscorewidthauto` reverts to the default). It may wrap onto several lines and keeps full support for initial letters, including ones spanning several lines. See [#1771](https://github.com/gregorio-project/gregorio/issues/1771).
 - Code for several features related to horizontal spacing (spacing between non-bar syllables, syllable rewriting, clearing, and hyphenation) was moved into Lua. This results in some changes in horizontal spacing, which, if perceptible, should be improvements. See [#1720](https://github.com/gregorio-project/gregorio/issues/1720).
 
 ### Changed

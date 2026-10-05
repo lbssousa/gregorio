@@ -208,6 +208,61 @@ includes it directly in the document.
 \end{latexcode}
 
 
+\subsubsection{Boxed scores}
+\label{sec:boxed-scores}
+
+The macro in this section typesets a score confined to a specific width,
+e.g.\ to fit it in a table cell or a list item, or to embed it in running
+text at some explicit width other than the page's.  A plain
+\verb|\gregorioscore| does not handle the first two reliably: sitting inside
+a table cell (a \texttt{p\{...\}}/\texttt{tabularx} column), its staff lines
+can come out wrong, and inside a list item
+(\texttt{itemize}/\texttt{enumerate}) it starts flush with the page margin
+instead of lining up with the item's own indentation.  A boxed score does
+not share the baseline of the surrounding text: it is a block of its own,
+exactly like an ordinary \verb|\gregorioscore|, only narrower.  In particular it may wrap onto several lines, and its initial
+letter (including one spanning several lines) is typeset exactly as it
+would be for an unboxed score.
+
+\macroname{\textbackslash boxedgregorioscore}{[\optional{\#1}]\{\#2\}}{gregoriotex-main.tex}
+Includes the score in \texttt{\#2}, exactly as \verb|\gregorioscore| would,
+but confined to a \verb|\vtop| of controlled width instead of using the
+full \texttt{\textbackslash hsize}.
+
+\begin{argtable}
+  \#1 & \texttt{n}/\texttt{a}/\texttt{f} & Optional. Same meaning as for
+  \verb|\gregorioscore|.\\
+  \#2 & string & Relative or absolute path to the score, same conventions as
+  \verb|\gregorioscore|.\\
+\end{argtable}
+
+By default the score is set at \verb|\linewidth|, the width actually
+available on the current line.  This is what is wanted both inside a table
+cell (a \texttt{p\{...\}}/\texttt{tabularx} column) and inside a list item
+(\texttt{itemize}/\texttt{enumerate}): a table cell keeps
+\texttt{\textbackslash hsize} and \verb|\linewidth| equal, while a list item
+narrows only \verb|\linewidth|, doing its indentation with
+\texttt{\textbackslash leftskip} instead -- either way \verb|\linewidth| is
+the width actually on offer.  Use \verb|\gresetboxedscorewidth| to set an
+explicit width instead, for instance when calling \verb|\boxedgregorioscore|
+directly in running text:
+
+\begin{latexcode}
+  {\gresetboxedscorewidth{4cm}\boxedgregorioscore{TecumPrincipium}}
+\end{latexcode}
+
+\macroname{\textbackslash gresetboxedscorewidth}{\{\#1\}}{gregoriotex-main.tex}
+Sets the width at which \verb|\boxedgregorioscore| typesets its score.
+
+\begin{argtable}
+  \#1 & distance & The width to use.\\
+\end{argtable}
+
+\macroname{\textbackslash gresetboxedscorewidthauto}{}{gregoriotex-main.tex}
+Reverts to the default behavior of \verb|\boxedgregorioscore|: use
+\verb|\linewidth| rather than a width set by \verb|\gresetboxedscorewidth|.
+
+
 \subsubsection{Point-and-click}
 
 Gregorio can add Lilypond-like point-and-click links into the output PDF
