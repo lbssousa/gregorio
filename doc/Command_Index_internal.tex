@@ -1756,14 +1756,14 @@ number of lines for the staff.
 Alias that will hold the character for the dotted divisio maior backing for the
 current number of lines for the staff.
 
-\macroname{\textbackslash gre@nabccharno}{\#1\#2\#3\#4}{gregoriotex-nabc.tex}
-Prints the nabc glyphs for the given nabc string.
+\macroname{\textbackslash gre@nabccharno}{\#1\#2\#3}{gregoriotex-nabc.tex}
+Prints the nabc glyphs for the given nabc string.  The scaling factor applied
+to the font metrics is derived from the size of the currently selected font.
 
 \begin{argtable}
   \#1 & string & nabc code representing the character\\
   \#2 & string & name of nabc font to use\\
-  \#3 & integer & scaling factor\\
-  \#4 & integer & voice number (1 = above staff, 2 = below staff)\\
+  \#3 & integer & voice number (1 = above staff, 2 = below staff)\\
 \end{argtable}
 
 
