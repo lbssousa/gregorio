@@ -224,6 +224,11 @@ disturbs the leading of the surrounding paragraph as little as possible.  The
 baseline of the snippet is the baseline of its lyrics, which therefore line up
 with the surrounding text.
 
+A third macro of the same family, \verb|\nabcneumesnippet|, typesets ancient
+notation glyphs on their own; it is documented with the other ancient notation
+commands in section~\ref{sec:ancient-notation}, together with
+\verb|\grenabcfont|, which picks the font and size it uses.
+
 \macroname{\textbackslash gabcinlinesnippet}{[\optional{\#1}]\{\#2\}}{gregoriotex-snippet.tex}
 Converts the gabc notation specified in \texttt{\#2} to Gregorio\TeX\ and
 includes it inside the current paragraph.
@@ -256,7 +261,9 @@ invisible.
 \begin{argtable}
   \#1 & integer & Optional. The number of nabc voices, as in the
   \texttt{nabc-lines} gabc header. Voice 1 is placed above the neume, voice 2
-  below it.  Note that this is a \emph{count}, not a voice number.\\
+  below it.  Note that this is a \emph{count}, not a voice number: in
+  \verb|\nabcneumesnippet| the optional argument selects \emph{which} voice
+  to use.\\
   \#2 & string & The gabc note group, without its enclosing parentheses.
   When \texttt{\#1} is given, the nabc voices follow, separated by
   \texttt{\textbar} as usual.\\
@@ -1588,11 +1595,16 @@ so the same font may be used at several sizes in one document.
 
 \macroname{\textbackslash nabcneumesnippet}{[\optional{\#1}]\{\#2\}}{gregoriotex-nabc.tex}
 Typesets ancient notation glyphs on their own, with no square notation and no
-staff, at the point where the macro appears.
+staff, at the point where the macro appears.  It is the ancient notation
+counterpart of the inline snippets of section~\ref{sec:inline-snippets}; use
+\verb|\gabcneumesnippet| instead to put square notation under the nabc
+glyphs.
 
 \begin{argtable}
   \#1 & integer & Optional. The nabc voice whose font is to be used: 1
-  (default) or 2.\\
+  (default) or 2.  Note that this selects \emph{which} voice: in
+  \verb|\gabcneumesnippet| the optional argument is instead the \emph{number}
+  of voices.\\
   \#2 & string & The \texttt{nabc} syntax which indicates what neumes are to
   be printed.\\
 \end{argtable}
