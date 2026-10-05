@@ -14,6 +14,7 @@ As of v3.0.0 this project adheres to [Semantic Versioning](http://semver.org/). 
 - Fixed two bugs affecting snippets and ancient notation. `\gabcsnippet` passed the `--deprecation-errors` option to `gregorio` when deprecated constructs were *allowed* instead of when they were forbidden, i.e. exactly the other way round from `\gregorioscore`. The metrics of a nabc font were cached at the size at which the font was first loaded, so using the same nabc font at two different sizes in one document gave wrong raises and kerns for the second one; they are now scaled to the size of the font actually in use. See [#1771](https://github.com/gregorio-project/gregorio/issues/1771).
 
 ### Added
+- Added `\nabcneumesnippet`, which typesets ancient notation (nabc) glyphs on their own, with no square notation and no staff, inside a paragraph of running text, and `\grenabcfont`, which selects the nabc font and size of a voice for the current TeX group only (unlike the global `\gresetnabcfont`), so that a single `\nabcneumesnippet` can pick its own. See [#1771](https://github.com/gregorio-project/gregorio/issues/1771).
 - Code for several features related to horizontal spacing (spacing between non-bar syllables, syllable rewriting, clearing, and hyphenation) was moved into Lua. This results in some changes in horizontal spacing, which, if perceptible, should be improvements. See [#1720](https://github.com/gregorio-project/gregorio/issues/1720).
 
 ### Changed

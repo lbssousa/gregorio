@@ -1439,6 +1439,22 @@ Prints the nabc glyphs for the given nabc string.
   \#2 & string & The \texttt{nabc} syntax which indicates what neumes are to be printed.\\
 \end{argtable}
 
+\macroname{\textbackslash gre@nabc@printchar}{\#1\#2\#3}{gregoriotex-nabc.tex}
+Common implementation of \verb|\gre@nabcvoicechar| and
+\verb|\gre@nabcneumesnippet|: selects the font of a nabc voice and prints a
+nabc string with it.  The above-lines and below-lines styles are meant for
+positioning inside a score, so \verb|\nabcneumesnippet| asks for them to be
+skipped.
+
+\begin{argtable}
+  \#1 & integer & the voice whose above/below-lines style is applied, or \texttt{0} for none\\
+  \#2 & integer & the voice whose font is used\\
+  \#3 & string & The \texttt{nabc} syntax which indicates what neumes are to be printed.\\
+\end{argtable}
+
+\macroname{\textbackslash gre@nabcneumesnippet}{[\#1]\{\#2\}}{gregoriotex-nabc.tex}
+Internal to \verb|\nabcneumesnippet|.
+
 \macroname{\textbackslash gre@nabc@prepare}{\#1\#2}{gregoriotex-main.tex}
 Phase 1 of NABC two-phase processing: pre-evaluates NABC content, tracks the maximum NABC width in \verb=\gre@dimen@nabc@maxwidth= for right-overflow detection by \verb=\gre@compute@nabc@extrakern=, emits note-level kern for left overflow (in \texttt{neume} alignment mode) unless \verb=\ifgre@nabc@suppress@leftoverflow= is true, and saves the rendered content in a box register.
 
@@ -1556,12 +1572,40 @@ The font for some of the extra characters, such as the bar for barred letters.
 The font for ancient notation.
 
 \macroname{\textbackslash gre@setnabcvoicefont}{[\optional{\#1}]\{\#2\#3\}}{gregoriotex-nabc.tex}
-Prints the nabc glyphs for the given nabc string.
+Internal to \verb|\gresetnabcfont|: selects the font of a nabc voice globally.
 
 \begin{argtable}
   \#1 & integer & Optional. The nabc voice: 1 (default) = above staff, 2 = below staff.\\
   \#2 & string & the name of the font, either \texttt{gregall}, \texttt{grelaon}, or \texttt{gresgmodern}\\
   \#3 & integer & point size at which the font should be loaded\\
+\end{argtable}
+
+\macroname{\textbackslash gre@nabcvoicefont@local}{[\optional{\#1}]\{\#2\#3\}}{gregoriotex-nabc.tex}
+Internal to \verb|\grenabcfont|: same as \verb|\gre@setnabcvoicefont|, but the
+selection is local to the current \TeX\ group.
+
+\begin{argtable}
+  \#1 & integer & Optional. The nabc voice: 1 (default) = above staff, 2 = below staff.\\
+  \#2 & string & the name of the font\\
+  \#3 & integer & point size at which the font should be loaded\\
+\end{argtable}
+
+\macroname{\textbackslash gre@nabcvoicefont@do}{\#1\#2\#3\#4}{gregoriotex-nabc.tex}
+Common implementation of \verb|\gre@setnabcvoicefont| and
+\verb|\gre@nabcvoicefont@local|.
+
+\begin{argtable}
+  \#1 & code & \verb|\global| for a global selection, empty for a local one\\
+  \#2 & integer & the nabc voice\\
+  \#3 & string & the name of the font\\
+  \#4 & integer & point size at which the font should be loaded\\
+\end{argtable}
+
+\macroname{\textbackslash gre@nabc@ensurefont}{\#1}{gregoriotex-nabc.tex}
+Loads the default font of a nabc voice if no font has been selected for it yet.
+
+\begin{argtable}
+  \#1 & integer & the nabc voice\\
 \end{argtable}
 
 

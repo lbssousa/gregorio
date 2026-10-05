@@ -1476,6 +1476,7 @@ will define the behavior at the next set of headers.
 
 
 \subsubsection{Ancient Notation}
+\label{sec:ancient-notation}
 For a full description of how to make use of the ancient notation capabilities of Gregorio and Gregorio\TeX, look at the GregorioNabcRef documentation.  The commands listed here allow the manipulation of settings related to that notation.
 
 \macroname{\textbackslash gresetnabcfont}{[\#1]\{\#2\}\{\#3\}}{gregoriotex-nabc.tex}
@@ -1486,6 +1487,37 @@ Macro to set the font to be used for the ancient notation.
   \#2 & string & the name of the font, either \texttt{gregall}, \texttt{grelaon}, or \texttt{gresgmodern}\\
   \#3 & integer & point size at which the font should be loaded\\
 \end{argtable}
+
+\macroname{\textbackslash grenabcfont}{[\#1]\{\#2\}\{\#3\}}{gregoriotex-nabc.tex}
+Same as \verb|\gresetnabcfont|, except that the selection is local to the
+current \TeX\ group.  This is what makes it possible to pick a font and a
+size for a single \verb|\nabcneumesnippet| without disturbing the rest of the
+document.  The metrics of the ancient notation fonts are scaled accordingly,
+so the same font may be used at several sizes in one document.
+
+\begin{argtable}
+  \#1 & integer & the nabc voice: 1 (default) = above staff, 2 = below staff.\\
+  \#2 & string & the name of the font, either \texttt{gregall}, \texttt{grelaon}, or \texttt{gresgmodern}\\
+  \#3 & integer & point size at which the font should be loaded\\
+\end{argtable}
+
+\macroname{\textbackslash nabcneumesnippet}{[\optional{\#1}]\{\#2\}}{gregoriotex-nabc.tex}
+Typesets ancient notation glyphs on their own, with no square notation and no
+staff, at the point where the macro appears.
+
+\begin{argtable}
+  \#1 & integer & Optional. The nabc voice whose font is to be used: 1
+  (default) or 2.\\
+  \#2 & string & The \texttt{nabc} syntax which indicates what neumes are to
+  be printed.\\
+\end{argtable}
+
+\medskip For example:\par\medskip
+\begin{latexcode}
+  the virga \nabcneumesnippet{vi} and the pes \nabcneumesnippet{pe}, and the
+  same in Laon: {\grenabcfont[1]{grelaon}{10}\nabcneumesnippet{vi}
+  \nabcneumesnippet{pe}}
+\end{latexcode}
 
 \subsubsection{Alterations (Flats, Naturals, and Sharps)}\label{setalterationeffect}
 
