@@ -14,6 +14,7 @@ As of v3.0.0 this project adheres to [Semantic Versioning](http://semver.org/). 
 
 ### Added
 - Added `\gabcinlinesnippet`, which typesets a small gabc score (with nabc, if any) inside a paragraph of running text rather than as a display: the snippet is a single line, its staff lines are trimmed to the width of the music and its baseline is that of its lyrics. `\gresetinlinesnippetraise` and `\gresetinlinesnippethook` tune how snippets are typeset. See [#1771](https://github.com/gregorio-project/gregorio/issues/1771).
+- Added `\gabcneumesnippet`, which typesets a bare neume inside a paragraph of running text: no staff lines, no clef and no lyrics, optionally accompanied by nabc glyphs above and below. See [#1771](https://github.com/gregorio-project/gregorio/issues/1771).
 - Code for several features related to horizontal spacing (spacing between non-bar syllables, syllable rewriting, clearing, and hyphenation) was moved into Lua. This results in some changes in horizontal spacing, which, if perceptible, should be improvements. See [#1720](https://github.com/gregorio-project/gregorio/issues/1720).
 
 ### Changed

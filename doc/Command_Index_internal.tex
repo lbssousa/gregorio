@@ -345,8 +345,9 @@ group just before the score itself.
 Records the settings which a snippet may change globally (the staff size, and
 whether the staff dimensions are zeroed), so that
 \verb=\gre@snippet@restorestate= can put them back.  A \TeX\ group is not
-enough, since those settings are set with \verb=\global=, and the user's
-\verb=\gresetinlinesnippethook= may change either.
+enough, since those settings are set with \verb=\global=.  The staff size is
+changed by the user's \verb=\gresetinlinesnippethook=, the zeroing by
+\verb=\gre@neumesnippet@settings=.
 
 \macroname{\textbackslash gre@snippet@restorestate}{}{gregoriotex-snippet.tex}
 Restores what \verb=\gre@snippet@savestate= recorded and recomputes the
@@ -359,6 +360,20 @@ zeroing in force before the snippet.
 
 \macroname{\textbackslash gre@inlinesnippet@option}{[\#1]\#2}{gregoriotex-snippet.tex}
 Internal to \verb=\gabcinlinesnippet=.
+
+\macroname{\textbackslash gre@neumesnippet@option}{[\#1]\#2}{gregoriotex-snippet.tex}
+Internal to \verb=\gabcneumesnippet=.
+
+\macroname{\textbackslash gre@neumesnippet@settings}{}{gregoriotex-snippet.tex}
+The settings which turn a snippet into a bare neume: invisible staff lines,
+invisible clef, and no space reserved for the missing clef.  Since the notes
+stay visible, \verb=\gre@staffdimensions@reevaluate= does not zero the staff
+dimensions, so this macro zeroes them by hand with
+\verb=\gre@staffdimensions@dozero=.  This collapses the score onto the text
+baseline without affecting the shape of the neume, since the pitch
+offsets computed by \verb=\gre@calculate@glyphraisevalue= derive from
+\verb=\gre@dimen@interstafflinedistancebase= rather than from
+\verb=\gre@dimen@interstafflinespace=.
 
 \macroname{\textbackslash gre@writemode}{\#1\#2\#3}{gregoriotex-main.tex}
 Macro that writes its arguments with \verb=\greannotation=.  This
