@@ -208,8 +208,9 @@ includes it directly in the document.
 \end{latexcode}
 
 Like a score included with \verb|\gregorioscore|, a \verb|\gabcsnippet| is a
-paragraph of its own.  Use \verb|\gabcinlinesnippet| (below) for a
-snippet which is to appear inside a paragraph of running text.
+paragraph of its own.  Use \verb|\gabcinlinesnippet| or
+\verb|\gabcneumesnippet| (below) for a snippet which is to appear inside a
+paragraph of running text.
 
 
 \subsubsection{Inline snippets}
@@ -242,6 +243,29 @@ includes it inside the current paragraph.
 
 If the snippet contains a forced line break (\texttt{z} or \texttt{Z}), only
 the first line is kept and a warning is issued.
+
+\macroname{\textbackslash gabcneumesnippet}{[\optional{\#1}]\{\#2\}}{gregoriotex-snippet.tex}
+Typesets a bare neume inside the current paragraph: no staff lines, no clef,
+and no lyrics.  The argument is the content of a single gabc note group, that
+is, what would appear between parentheses in a gabc file, so that
+\verb|\gabcneumesnippet{fgf}| is the equivalent of
+\verb|\gabcinlinesnippet{(fgf)}| with the staff lines and the clef made
+invisible.
+
+\begin{argtable}
+  \#1 & integer & Optional. The number of nabc voices, as in the
+  \texttt{nabc-lines} gabc header. Voice 1 is placed above the neume, voice 2
+  below it.  Note that this is a \emph{count}, not a voice number.\\
+  \#2 & string & The gabc note group, without its enclosing parentheses.
+  When \texttt{\#1} is given, the nabc voices follow, separated by
+  \texttt{\textbar} as usual.\\
+\end{argtable}
+
+\medskip For example:\par\medskip
+\begin{latexcode}
+  a torculus \gabcneumesnippet{fgf}, and the same with its
+  St.~Gall notation above and below: \gabcneumesnippet[2]{fgf|vi|ta}
+\end{latexcode}
 
 \macroname{\textbackslash gresetinlinesnippetraise}{\{\#1\}}{gregoriotex-snippet.tex}
 Sets the vertical offset applied to inline snippets.  The default is
